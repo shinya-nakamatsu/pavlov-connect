@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>入退室きろく</title>
+
+<!-- ホーム画面に追加したときに全画面のアプリとして開くための指定 -->
+<link rel="manifest" href="manifest-kiosk.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="入退室">
+<!-- アイコンはブランド中立にする。1つのURLにつきホーム画面アイコンは1つしか持てず、
+     PAVLOVのアイコンを富士学院のiPadに出すわけにいかないため。 -->
+<link rel="apple-touch-icon" href="icon-kiosk-180.png">
+<link rel="icon" href="icon-kiosk-192.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!--
+  ============================================================
+  入退室きろく（教室のiPadに置きっぱなしにする打刻画面）
+  PAVLOV Connect と同じ Supabase を使う。保護者への通知は
+  Connect 側のトリガーが自動で行うので、この画面には通知処理は無い。
+
+  【この画面の設計で気をつけたこと】
+   ・入室モードと退室モードを分ける。退室モードは戻し忘れが起きるので
+     60秒さわらなければ自動で入室モードへ戻す（1人退室したら8秒で戻す）。
+   ・入室モードでは在室中の人、退室モードでは未入室の人をタップできない。
+     これで二度押しと逆打刻が構造的に起きない。
+   ・在室中の人は「押せない」だけで薄くしない。この画面は打刻装置であると
+     同時に「今だれが来ているか」の掲示板でもあるため。
+   ・生徒名はこのファイルに書かない。必ず Connect の名簿から読む。
+  ============================================================
+-->
+<style>
+:root{
+  --brand:#c30d23; --brand-dark:#950006; --brand-pale:#fbeef0; --brand-line:#f0c9ce;
+  --out:#0b7d3e;
+}
+:root[data-brand="fuji"]{
+  --brand:#0f3b7d; --brand-dark:#0a2a5c; --brand-pale:#edf1f8; --brand-line:#c9d5e8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+body{font-family:"Noto Sans JP","Hiragino Sans",system-ui,sans-serif;color:#111;background:#fff;
+     -webkit-user-select:none;user-select:none}
+button{border-radius:0;appearance:none;font-family:inherit}
+
+.wrap{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
+
+.bar{flex:0 0 auto;background:#111;color:#fff;display:flex;align-items:center;gap:12px;
+     padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
+.bar.out{background:var(--out)}
+.icon{background:none;border:0;color:#fff;font-size:24px;line-height:1;padding:6px 8px;cursor:pointer}
+.right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.modename{font-size:19px;font-weight:700;letter-spacing:.04em}
+.modebtn{background:#fff;color:#111;border:1px solid #fff;padding:10px 18px;font-size:16px;font-weight:700;cursor:pointer}
+
+.tabs{flex:0 0 auto;display:flex;border-bottom:2px solid #111}
+.tab{flex:1;background:#fff;color:#111;border:1px solid #111;border-right:0;padding:14px 4px;cursor:pointer}
+.tab:last-child{border-right:1px solid #111}
+.tab .g{font-size:26px;font-weight:700;letter-spacing:.06em}
+.tab[aria-selected="true"]{background:#111;color:#fff}
+
+.grid{flex:1 1 auto;overflow-y:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;
+      align-content:start;-webkit-overflow-scrolling:touch}
+.tile{position:relative;background:var(--brand-pale);border:1px solid var(--brand-line);color:#111;
+      min-height:96px;padding:14px 6px 10px;font-size:27px;font-weight:500;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.tile .t{font-size:13px;font-weight:400;margin-top:4px}
+.tile.in{background:var(--brand);border-color:var(--brand);color:#fff}
+.tile:active{filter:brightness(.9)}
+.tile[disabled]{opacity:.45;cursor:default}
+/* 在室中は押せないだけで薄くしない */
+.tile.in[disabled]{opacity:1}
+.tile .flag{position:absolute;top:2px;left:0;right:0;font-size:12px;font-weight:700;color:#c00}
+.tile.in .flag{color:#ffd7dd}
+
+.foot{flex:0 0 auto;background:#111;color:#fff;font-size:14px;display:flex;align-items:center;gap:16px;
+      padding:8px 16px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.foot .clock{margin-left:auto;font-size:18px;font-weight:700;letter-spacing:.05em}
+
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%) translateY(20px);
+       background:#111;color:#fff;padding:16px 28px;font-size:22px;font-weight:700;text-align:center;
+       opacity:0;pointer-events:none;transition:.18s;z-index:20}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.out{background:var(--out)}
+.toast.warn{background:#8a6d00}
+
+.center{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{width:100%;max-width:420px}
+.card h1{font-size:22px;margin:0 0 20px}
+.card input{width:100%;font-size:18px;padding:14px;margin-bottom:12px;border:1px solid #999;font-family:inherit}
+.card .go{width:100%;font-size:18px;font-weight:700;padding:16px;background:var(--brand);color:#fff;border:0;cursor:pointer}
+.err{color:#c00;font-size:14px;margin-bottom:12px;min-height:1.2em}
+
+.menu{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;display:flex;align-items:center;justify-content:center}
+.menu .box{background:#fff;padding:24px;width:min(92vw,380px)}
+.menu button{display:block;width:100%;text-align:left;font-size:17px;padding:14px;margin-bottom:8px;
+             background:#f2f2f2;color:#111;border:1px solid #ccc;cursor:pointer}
+.menu .who{font-size:13px;color:#666;margin-bottom:12px;word-break:break-all}
+
+@media (max-width:760px){
+  .grid{grid-template-columns:repeat(3,1fr)}
+  .tile{font-size:20px;min-height:84px}
+  .tab .g{font-size:19px}
+}
+@media (max-width:430px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .modename{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+// ── Connect（Supabase）への接続。publishable キーは公開してよい種類 ──
+var SUPABASE_URL = 'https://eabkcqutjmyhauwybztf.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y';
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 学年の並び順（Connect の grade 文字列に合わせる）
+var GRADES = ['小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3','既卒・その他'];
+
+var board = [];          // attendance_board() の結果
+var grade = null;
+var room  = null;        // 表示中の教室（複数見える権限のときだけ切替が出る）
+var mode  = 'in';
+var modeTimer = null;
+var lockUntil = {};      // 生徒ごとの二度押しロック
+var reloadTimer = null;
+
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function hhmm(d){ return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+// 端末の識別子（二重送信防止キーに使う）
+var deviceId = localStorage.getItem('kiosk_device_id');
+if(!deviceId){ deviceId = 'ipad-'+Math.random().toString(36).slice(2,10); localStorage.setItem('kiosk_device_id', deviceId); }
+
+// ── ブランド（教室名で判定。Connect と同じ挙動）──
+function applyBrand(){
+  var fuji = room && String(room).indexOf('富士学院') >= 0;
+  document.documentElement.setAttribute('data-brand', fuji ? 'fuji' : 'pavlov');
+  var m = document.querySelector('meta[name="theme-color"]');
+  if(!m){ m = document.createElement('meta'); m.name='theme-color'; document.head.appendChild(m); }
+  m.content = '#1f2430';   // 画面の外枠は中立色。中身の色だけブランドで変える
+}
+
+// ── ログイン画面 ──
+function viewLogin(msg){
+  $('app').innerHTML =
+    '<div class="wrap"><div class="center"><div class="card">'+
+    '<h1>入退室きろく</h1>'+
+    '<div class="err" id="err">'+esc(msg||'')+'</div>'+
+    '<input id="mail" type="email" inputmode="email" autocomplete="username" placeholder="メールアドレス">'+
+    '<input id="pass" type="password" autocomplete="current-password" placeholder="パスワード">'+
+    '<button class="go" id="go">ログイン</button>'+
+    '</div></div></div>';
+  $('go').onclick = async function(){
+    $('err').textContent = '';
+    var r = await sb.auth.signInWithPassword({ email: $('mail').value.trim(), password: $('pass').value });
+    if(r.error){ $('err').textContent = 'ログインできませんでした。メールアドレスとパスワードを確認してください。'; }
+  };
+}
+
+// ── 名簿・在室状況の読み込み ──
+async function loadBoard(){
+  var r = await sb.rpc('attendance_board');
+  if(r.error) throw r.error;
+  board = r.data || [];
+  var rooms = [];
+  board.forEach(function(s){ if(rooms.indexOf(s.classroom_name)<0) rooms.push(s.classroom_name); });
+  if(!room || rooms.indexOf(room)<0) room = rooms[0] || null;
+  applyBrand();
+  return rooms;
+}
+
+function rows(){ return board.filter(function(s){ return s.classroom_name === room; }); }
+function gradesInUse(){
+  var set = {}; rows().forEach(function(s){ set[s.grade||''] = 1; });
+  var list = GRADES.filter(function(g){ return set[g]; });
+  if(set['']) list.push('');
+  return list.length ? list : [''];
+}
+function isIn(s){ return s.last_kind === 'in'; }
+
+// ── メイン画面 ──
+function viewMain(rooms){
+  $('app').innerHTML =
+    '<div class="wrap">'+
+      '<div class="bar" id="bar">'+
+        '<button class="icon" id="gear" title="設定">⚙</button>'+
+        '<button class="icon" id="reload" title="最新に更新">⟳</button>'+
+        (rooms.length>1 ? '<span id="roomsw" style="cursor:pointer;font-weight:700">'+esc(room)+' ▾</span>' : '')+
+        '<div class="right">'+
+          '<span class="modename" id="modename">入室モード</span>'+
+          '<button class="modebtn" id="modebtn">モード切替</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="tabs" id="tabs"></div>'+
+      '<div class="grid" id="grid"></div>'+
+      '<div class="foot">'+
+        '<span id="date"></span><span>'+esc(room||'')+'</span>'+
+        '<span class="clock" id="clock"></span>'+
+      '</div>'+
+      '<div class="toast" id="toast"></div>'+
+    '</div>';
+  $('modebtn').onclick = toggleMode;
+  $('gear').onclick = openMenu;
+  $('reload').onclick = async function(){ await refresh(); toast('最新にしました','warn'); };
+  if($('roomsw')) $('roomsw').onclick = function(){
+    var i = rooms.indexOf(room); room = rooms[(i+1)%rooms.length]; applyBrand(); viewMain(rooms);
+  };
+  drawTabs(); drawGrid(); applyMode(); tick();
+}
+
+function drawTabs(){
+  var gs = gradesInUse();
+  if(gs.indexOf(grade) < 0) grade = gs[0];
+  $('tabs').innerHTML = gs.map(function(g){
+    return '<button class="tab" role="tab" aria-selected="'+(g===grade)+'" data-g="'+esc(g)+'">'+
+           '<div class="g">'+esc(g||'未設定')+'</div></button>'; }).join('');
+  Array.prototype.forEach.call($('tabs').querySelectorAll('.tab'), function(t){
+    t.onclick = function(){ grade = t.dataset.g; drawTabs(); drawGrid(); };
+  });
+}
+
+function drawGrid(){
+  var list = rows().filter(function(s){ return (s.grade||'') === grade; })
+    .sort(function(a,b){ return String(a.name_kana||a.student_name)
+      .localeCompare(String(b.name_kana||b.student_name),'ja'); });
+  $('grid').innerHTML = list.map(function(s){
+    var inRoom = isIn(s);
+    var canTap = (mode==='in') ? !inRoom : inRoom;
+    var t = s.last_at ? hhmm(new Date(s.last_at)) : '';
+    var time = inRoom && t ? '<span class="t">'+t+' 入室</span>' : '';
+    var flag = s.absence_kind
+      ? '<span class="flag">'+({absent:'欠席連絡',late:'遅刻連絡',early:'早退連絡'}[s.absence_kind]||'')+'</span>'
+      : '';
+    return '<button class="tile'+(inRoom?' in':'')+'" data-id="'+esc(s.student_id)+'"'+(canTap?'':' disabled')+'>'+
+           flag+'<span>'+esc(s.student_name)+'</span>'+time+'</button>';
+  }).join('') || '<div style="padding:24px;color:#666">この学年の生徒がいません</div>';
+  Array.prototype.forEach.call($('grid').querySelectorAll('.tile'), function(el){
+    el.onclick = function(){
+      var s = board.filter(function(x){ return String(x.student_id)===el.dataset.id; })[0];
+      if(s) punch(s);
+    };
+  });
+}
+
+// ── モード ──
+function toggleMode(){ mode = (mode==='in'?'out':'in'); applyMode(); armAutoBack(60000); }
+function applyMode(){
+  var bar = $('bar'); if(!bar) return;
+  bar.classList.toggle('out', mode==='out');
+  $('modename').textContent = (mode==='in') ? '入室モード' : '退室モード';
+  drawGrid();
+}
+function armAutoBack(ms){
+  clearTimeout(modeTimer);
+  if(mode!=='out') return;
+  modeTimer = setTimeout(function(){ mode='in'; applyMode(); toast('入室モードに戻りました','warn'); }, ms);
+}
+
+// ── 打刻 ──
+async function punch(s){
+  var now = Date.now();
+  if(lockUntil[s.student_id] && now < lockUntil[s.student_id]) return;  // 二度押しロック
+  lockUntil[s.student_id] = now + 5000;
+  var goingIn = (mode==='in');
+  var r = await sb.rpc('record_attendance', {
+    p_student_ref: s.student_id,
+    p_kind: goingIn ? 'in' : 'out',
+    p_method: 'manual',
+    p_source_ref: deviceId + '-' + now
+  });
+  if(r.error){
+    lockUntil[s.student_id] = 0;
+    toast('記録できませんでした（' + (r.error.message||'通信エラー') + '）','warn');
+    return;
+  }
+  s.last_kind = goingIn ? 'in' : 'out';
+  s.last_at = new Date().toISOString();
+  drawGrid();
+  toast(s.student_name + ' さん　' + (goingIn?'入室':'退室') + '　' + hhmm(new Date()), goingIn?'in':'out');
+  if(!goingIn) armAutoBack(8000);
+}
+
+// ── 小物 ──
+function toast(msg, kind){
+  var el = $('toast'); if(!el) return;
+  el.textContent = msg;
+  el.className = 'toast show' + (kind==='out' ? ' out' : kind==='warn' ? ' warn' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.className='toast'; }, 1800);
+}
+function tick(){
+  var c = $('clock'), d = $('date'); if(!c||!d) return;
+  var n = new Date(), w = ['日','月','火','水','木','金','土'][n.getDay()];
+  c.textContent = hhmm(n);
+  d.textContent = n.getFullYear()+'年'+(n.getMonth()+1)+'月'+n.getDate()+'日（'+w+'）';
+}
+setInterval(tick, 1000);
+
+async function refresh(){
+  try{ var rooms = await loadBoard(); drawTabs(); drawGrid(); return rooms; }catch(e){ return null; }
+}
+
+function openMenu(){
+  var el = document.createElement('div');
+  el.className = 'menu';
+  el.innerHTML = '<div class="box">'+
+    '<div class="who" id="who"></div>'+
+    '<button id="m-reload">名簿を読み直す</button>'+
+    '<button id="m-out">ログアウト</button>'+
+    '<button id="m-close">閉じる</button></div>';
+  document.body.appendChild(el);
+  sb.auth.getUser().then(function(r){
+    var u = r && r.data && r.data.user;
+    var w = el.querySelector('#who');
+    if(w) w.textContent = u ? ('ログイン中: '+u.email) : '';
+  });
+  el.onclick = function(e){ if(e.target===el) el.remove(); };
+  el.querySelector('#m-close').onclick = function(){ el.remove(); };
+  el.querySelector('#m-reload').onclick = async function(){ el.remove(); await refresh(); toast('最新にしました','warn'); };
+  el.querySelector('#m-out').onclick = async function(){ el.remove(); await sb.auth.signOut(); };
+}
+
+// ── 起動 ──
+async function boot(){
+  var rooms;
+  try{ rooms = await loadBoard(); }
+  catch(e){
+    $('app').innerHTML = '<div class="wrap"><div class="center"><div class="card">'+
+      '<h1>名簿を読み込めませんでした</h1><div class="err">'+esc(e.message||'')+'</div>'+
+      '<button class="go" onclick="location.reload()">もう一度</button></div></div></div>';
+    return;
+  }
+  viewMain(rooms);
+  // 名簿と在室状況を5分ごとに読み直す（他の端末やConnect側の変更を拾う）
+  clearInterval(reloadTimer);
+  reloadTimer = setInterval(refresh, 5*60*1000);
+  // 別のiPadやスタッフPCの打刻をすぐ反映する
+  try{
+    sb.channel('kiosk-att')
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'attendance_logs'}, function(){
+        clearTimeout(window.__rt); window.__rt = setTimeout(refresh, 1200);
+      }).subscribe();
+  }catch(e){}
+}
+
+sb.auth.onAuthStateChange(function(_e, session){
+  if(session && session.user) boot(); else viewLogin();
+});
+sb.auth.getSession().then(function(r){
+  if(r && r.data && r.data.session) boot(); else viewLogin();
+});
+
+})();
+</script>
+</body>
+</html>

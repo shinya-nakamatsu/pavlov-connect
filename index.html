@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>PAVLOV Connect</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PAVLOV">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --red:#c30d23; --red-dark:#950006; --red-deep:#6e0010; --red-tint:#fbeef0; --red-line:#f0c9ce;
+  --black:#111111; --ink:#1a1a1a; --gray-9:#333; --gray-6:#6b6b6b; --gray-4:#9a9a9a;
+  --line:#e6e6e6; --line-2:#efefef; --bg:#ffffff; --card:#ffffff; --chat-bg:#ffffff;
+  --p:var(--red); --p-dark:var(--red-dark); --p-light:var(--red-tint); --accent:var(--red);
+  --text:var(--ink); --muted:var(--gray-6); --me:var(--red-tint); --sys:#ececec; --danger:var(--red); --ok:#111;
+  --r:0; --r-lg:0;
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+a{color:var(--red)}
+#app{height:100%;display:flex;flex-direction:column;max-width:720px;margin:0 auto;background:var(--bg);position:relative}
+@media(min-width:721px){#app{box-shadow:0 0 0 1px var(--line);min-height:100vh}}
+
+/* header — white, hairline, red accent bar */
+.hdr{position:sticky;top:0;z-index:20;background:#fff;color:var(--black);padding:calc(10px + var(--safe-top)) 14px 10px;display:flex;align-items:center;gap:8px;min-height:54px;border-bottom:1px solid var(--line)}
+.hdr::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--red)}
+.hdr h1{font-size:16px;margin:0;flex:1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em}
+.hdr .sub{font-size:11.5px;color:var(--gray-6);font-weight:400;display:block;letter-spacing:.02em}
+.hdr button{background:transparent;border:0;color:var(--red);padding:6px 8px;border-radius:0;font-size:14px;cursor:pointer;font-weight:600}
+.hdr button:active{background:var(--red-tint)}
+.hdr .mark{width:30px;height:30px;margin-right:2px}
+.hdr .back{font-size:24px;line-height:1;padding:0 8px 2px;color:var(--black);font-weight:400}
+
+/* content */
+.main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(64px + var(--safe-bottom))}
+.main.noTab{padding-bottom:var(--safe-bottom)}
+.wrap{padding:14px}
+.card{background:var(--card);border:1px solid #e3e3e3;border-radius:0;padding:16px;margin-bottom:12px}
+.card h2{font-size:13px;margin:0 0 12px;color:var(--black);letter-spacing:.12em;font-weight:700;text-transform:uppercase;padding-left:10px;border-left:3px solid var(--red);line-height:1.2}
+.muted{color:var(--muted);font-size:13px}
+.small{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}
+.grow{flex:1;min-width:0}
+.right{text-align:right}
+.center{text-align:center}
+.mt{margin-top:12px}.mb{margin-bottom:12px}
+.hide{display:none!important}
+.badge{display:inline-block;min-width:20px;padding:0 6px;height:20px;line-height:20px;border-radius:0;background:var(--red);color:#fff;font-size:11.5px;text-align:center;font-weight:700}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block}
+.pill{display:inline-block;padding:1px 9px;border-radius:0;font-size:11.5px;background:var(--red-tint);color:var(--red-dark);border:1px solid var(--red-line);font-weight:500}
+.pill.warn{background:#fff;color:var(--gray-6);border-color:var(--line)}
+.pill.ok{background:#fff;color:var(--red);border-color:var(--red)}
+.pill.gray{background:#f0f0f0;color:#555;border-color:#f0f0f0}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:0;border:1px solid var(--red);background:var(--red);color:#fff;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;letter-spacing:.06em;transition:background .15s,transform .05s}
+.btn:active{background:var(--red-dark);transform:translateY(1px)}
+.btn.sec{background:#fff;color:var(--black);border-color:#cfcfcf}
+.btn.sec:active{background:#f2f2f2}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--gray-6);font-weight:500}
+.btn.danger{background:#fff;color:var(--red);border-color:var(--red)}
+.btn.sm{padding:6px 12px;font-size:12.5px;border-radius:0}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.5;pointer-events:none}
+
+/* forms */
+label.f{display:block;margin-bottom:12px}
+label.f span{display:block;font-size:11.5px;color:var(--gray-6);margin-bottom:5px;letter-spacing:.04em}
+.in{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:0;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s}
+.in:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(195,13,35,.08)}
+textarea.in{min-height:96px;resize:vertical}
+.chk{display:inline-flex;align-items:center;gap:6px;margin:4px 8px 4px 0;padding:6px 12px;border:1px solid var(--line);border-radius:0;background:#fff;cursor:pointer;font-size:13px}
+.chk input{margin:0;accent-color:var(--red)}
+.chk.on{background:var(--red-tint);border-color:var(--red);color:var(--red-dark)}
+.err{background:var(--red-tint);color:var(--red-dark);border:1px solid var(--red-line);padding:10px 12px;border-radius:0;font-size:13px;margin-bottom:10px}
+.ok-msg{background:#f2f2f2;color:var(--black);padding:10px 12px;border-radius:0;font-size:13px;margin-bottom:10px;border-left:3px solid var(--red)}
+
+/* lists */
+.list{background:var(--card);border:1px solid #e3e3e3;border-radius:0;overflow:hidden;margin-bottom:12px}
+.item{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line-2);cursor:pointer;background:#fff}
+.item:last-child{border-bottom:0}
+.item:active{background:#f7f7f7}
+.item .av{width:42px;height:42px;border-radius:50%;background:#fff;border:1.5px solid var(--red);color:var(--red);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:16px}
+.item .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--black)}
+.item .d{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{font-size:11px;color:var(--gray-4);text-align:right;flex-shrink:0}
+.item.unread .t{color:var(--black)} .item.unread .d{color:var(--black);font-weight:500}
+.sect{font-size:11.5px;color:var(--gray-6);padding:12px 14px 4px;font-weight:700;letter-spacing:.1em}
+.empty{padding:48px 16px;text-align:center;color:var(--gray-4);font-size:13.5px}
+
+/* tabs */
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:var(--safe-bottom);max-width:720px;margin:0 auto}
+.tabs button{flex:1;border:0;background:transparent;padding:9px 4px 7px;color:var(--gray-4);font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;position:relative;letter-spacing:.06em;font-weight:500}
+.tabs button.on{color:var(--red);font-weight:700}
+.tabs button.on::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:2px;background:var(--red)}
+.tabs button .ic{font-size:21px;line-height:1;filter:grayscale(1);opacity:.55}
+.tabs button.on .ic{filter:none;opacity:1}
+.tabs button .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+
+/* filter chips */
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 14px 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:5px 13px;border-radius:0;border:1px solid var(--line);background:#fff;font-size:12.5px;cursor:pointer;color:var(--gray-9)}
+.chip.on{background:#fff;color:var(--red);border-color:var(--red);font-weight:700}
+
+/* chat */
+.chat{display:flex;flex-direction:column;height:100%}
+.chat .msgs{flex:1;overflow-y:auto;padding:14px 14px 8px;background:var(--chat-bg)}
+.dsep{text-align:center;margin:12px 0}
+.dsep span{background:#fff;color:var(--gray-4);font-size:11px;padding:2px 10px;letter-spacing:.06em}
+.m{display:flex;margin-bottom:8px;align-items:flex-end;gap:6px}
+.m.me{flex-direction:row-reverse}
+.m .bub{max-width:78%;padding:9px 13px;border-radius:0;background:#fff;white-space:pre-wrap;word-break:break-word;border:1px solid var(--line)}
+.m.me .bub{background:var(--red-tint);color:var(--ink);border-color:var(--red-line)}
+.m.them .bub{background:#f5f5f5;border-color:#ebebeb}
+.m .tm{font-size:10px;color:var(--gray-4);flex-shrink:0;padding-bottom:2px}
+.m .who{font-size:11px;color:var(--gray-6);margin:0 0 3px 4px}
+.m.sys{justify-content:center}
+.m.sys .bub{background:#fff;color:var(--gray-6);font-size:12px;border-radius:0;padding:5px 14px;max-width:90%;text-align:center;border:1px solid var(--line)}
+.m .bub.absence{border-left:3px solid var(--red)}
+.m.me .bub.absence{border-left:3px solid var(--red)}
+.m .bub.att{background:var(--red-tint);color:var(--red-dark);border-color:var(--red-line);font-weight:500}
+.m .bub img{max-width:100%;border-radius:0;display:block}
+.m .bub .file{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--red-dark)}
+.m.me .bub .file{color:var(--red-dark)}
+.compose{background:#fff;border-top:1px solid var(--line);padding:8px 8px calc(8px + var(--safe-bottom));display:flex;gap:6px;align-items:flex-end}
+.compose textarea{flex:1;border:1px solid var(--line);border-radius:0;padding:10px 15px;max-height:120px;resize:none;outline:none;line-height:1.4;background:#fff}
+.compose textarea:focus{border-color:var(--red);background:#fff}
+.compose button{border:0;background:transparent;font-size:22px;padding:6px;cursor:pointer;color:var(--gray-6);line-height:1}
+.compose button.send{background:var(--red);color:#fff;border-radius:0;width:40px;height:40px;font-size:18px;display:flex;align-items:center;justify-content:center}
+.compose button.send:active{background:var(--red-dark)}
+.quick{display:flex;gap:6px;padding:6px 8px 0;background:#fff;border-top:1px solid var(--line);overflow-x:auto}
+.quick .chip{font-size:12px}
+
+/* modal / sheet */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:721px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:720px;max-height:92vh;overflow-y:auto;border-radius:0;padding:18px 18px calc(18px + var(--safe-bottom));position:relative}
+.sheet::before{content:"";display:block;width:36px;height:3px;background:var(--red);margin:-6px auto 14px}
+@media(min-width:721px){.sheet{border-radius:0;max-width:560px}.sheet::before{display:none}}
+.sheet h3{margin:0 0 12px;font-size:16px;letter-spacing:.04em;color:var(--black)}
+.sheet .x{position:absolute;right:12px;top:8px}
+.ann-body{white-space:pre-wrap;word-break:break-word}
+.pin{color:var(--red)}
+.toast{position:fixed;left:50%;bottom:calc(80px + var(--safe-bottom));transform:translateX(-50%);background:var(--red);color:#fff;padding:10px 18px;border-radius:0;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;letter-spacing:.04em}
+.toast.on{opacity:.96}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:22px;letter-spacing:3px;font-weight:700;color:var(--red)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl td,.tbl th{padding:8px 6px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+.tbl th{font-size:11.5px;color:var(--gray-6);letter-spacing:.06em;font-weight:600}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading{padding:40px;text-align:center;color:var(--muted)}
+
+/* brand block (login / setup) */
+.brand{text-align:center;margin:8px 0 22px}
+.brand img{width:var(--logo-w,min(220px,62%));height:auto;display:block;margin:0 auto 12px}
+.brand .app{font-size:11px;letter-spacing:.32em;color:var(--black);font-weight:700;text-transform:uppercase}
+.brand .app b{color:var(--red);font-weight:700}
+.brand .org{font-size:12px;color:var(--gray-6);margin-top:4px;letter-spacing:.06em}
+.auth-wrap{max-width:420px;margin:32px auto 0;padding:0 18px 24px}
+.seg{display:flex;border:1px solid var(--red);border-radius:0;overflow:hidden;margin-bottom:14px}
+.seg button{flex:1;border:0;background:#fff;color:var(--black);padding:10px;font-weight:700;letter-spacing:.08em;cursor:pointer;font-size:13.5px}
+.seg button.on{background:var(--red);color:#fff}
+.logo{width:56px;height:56px;border-radius:0;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;margin:0 auto 12px}
+/* floating action button (guardian) */
+.fab{position:fixed;right:16px;bottom:calc(72px + var(--safe-bottom));z-index:30;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+@media(min-width:721px){.fab{right:calc(50% - 360px + 16px)}}
+.fab-main{background:var(--red);color:#fff;border:0;padding:13px 18px;font-weight:700;letter-spacing:.06em;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:14px}
+.fab-main:active{background:var(--red-dark)}
+.fab-menu{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.fab-menu button{background:#fff;border:1px solid var(--line);padding:12px 18px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:left;font-size:14px}
+.fab-menu button:active{background:var(--red-tint)}
+/* thread status */
+.st{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:1px 7px;margin-right:6px;vertical-align:1px;border:1px solid}
+.st-open{color:#fff;background:var(--red);border-color:var(--red)}
+.st-prog{color:var(--red);background:#fff;border-color:var(--red)}
+.st-done{color:var(--gray-4);background:#fff;border-color:var(--line)}
+.item.done .t,.item.done .d{color:var(--gray-6)}
+.item.done .av{border-color:var(--line);color:var(--gray-4)}
+.statusbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.stbtn{border:1px solid var(--line);background:#fff;color:var(--gray-6);padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.04em}
+.stbtn.on.st-open{background:var(--red);color:#fff;border-color:var(--red)}
+.stbtn.on.st-prog{background:#fff;color:var(--red);border-color:var(--red)}
+.stbtn.on.st-done{background:var(--black);color:#fff;border-color:var(--black)}
+.statusbar input[type=checkbox]{accent-color:var(--red)}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><span class="spin"></span></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =====================================================================
+   PAVLOV Connect — 設定
+   Supabase の Project URL と anon public キーをここに入れてください。
+   空のままだと、初回起動時に画面から入力できます（この端末だけに保存）。
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://eabkcqutjmyhauwybztf.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
+  APP_NAME: 'PAVLOV Connect',
+  ORG_NAME: '学習塾PAVLOV',
+  VERSION: '0.5.0',
+};
+
+/* ---------------- ブランド（教室・URLごとにロゴと色を出し分け） ---------------- */
+const BRANDS = {
+  pavlov: { key:'pavlov', org:'学習塾PAVLOV', app:'PAVLOV Connect', appHtml:'PAVLOV <b>Connect</b>',
+            logo:'logo.png', mark:'icon-192.png', favicon:'favicon.png', manifest:'manifest.json',
+            color:'#c30d23', dark:'#950006', tint:'#fbeef0', line:'#f0c9ce', logoW:'min(220px,62%)', hosts:['pavlov-connect'], classrooms:[] },
+  fuji:   { key:'fuji', org:'富士学院', app:'FujiGakuin Connect', appHtml:'FujiGakuin <b>Connect</b>',
+            logo:'logo-fuji.png', mark:'icon-fuji-192.png', favicon:'favicon-fuji.png', manifest:'manifest-fuji.json',
+            color:'#0f3b7d', dark:'#0a2a5c', tint:'#edf1f8', line:'#c9d5e8', logoW:'min(160px,44%)', hosts:['fuji-connect','fujigakuin'], classrooms:['富士学院'] },
+};
+function hostBrand(){
+  const h = location.hostname + location.pathname; const q = new URLSearchParams(location.search).get('brand');
+  if(q && BRANDS[q]) return BRANDS[q];
+  for(const b of Object.values(BRANDS)) if(b.hosts.some(x=>h.includes(x))) return b;
+  return BRANDS.pavlov;
+}
+function applyBrand(b){
+  S.brand = b; const r = document.documentElement.style;
+  r.setProperty('--red', b.color); r.setProperty('--red-dark', b.dark); r.setProperty('--red-tint', b.tint); r.setProperty('--red-line', b.line); r.setProperty('--logo-w', b.logoW);
+  document.title = b.app;
+  const set = (sel, attr, v) => { const el = document.querySelector(sel); if(el) el.setAttribute(attr, v); };
+  set('link[rel=icon]','href', b.favicon); set('link[rel=apple-touch-icon]','href', b.mark); set('link[rel=manifest]','href', b.manifest);
+  set('meta[name=apple-mobile-web-app-title]','content', b.key==='pavlov'?'PAVLOV':b.org);
+}
+// 保護者: 子ども全員が同じブランドの教室なら、その教室のブランドで表示
+function brandForChildren(children){
+  const host = hostBrand();
+  if(!children || !children.length) return host;
+  for(const b of Object.values(BRANDS)){
+    if(b.classrooms.length && children.every(c => b.classrooms.includes(c.classroom_name))) return b;
+  }
+  return children.every(c => !Object.values(BRANDS).some(b => b.classrooms.includes(c.classroom_name))) ? host : host;
+}
+
+/* ---------------- ユーティリティ ---------------- */
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nl2br = s => esc(s).replace(/\n/g,'<br>');
+const pad = n => String(n).padStart(2,'0');
+function fmtTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const y = new Date(now); y.setDate(now.getDate()-1);
+  if(sameDay) return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if(d.toDateString() === y.toDateString()) return '昨日';
+  if(d.getFullYear() === now.getFullYear()) return `${d.getMonth()+1}/${d.getDate()}`;
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
+function fmtDateFull(iso){ const d=new Date(iso); const w='日月火水木金土'[d.getDay()]; return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${w}）`; }
+function fmtDT(iso){ const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function hm(iso){ const d=new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function todayISO(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function toLocalInput(iso){ const d=iso?new Date(iso):new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+let toastT; function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2200); }
+function initial(name){ return (name||'?').trim().slice(0,1); }
+const GRADES = ['小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3','既卒','その他'];
+
+/* ---------------- 状態 ---------------- */
+const S = {
+  sb: null, session: null, profile: null, staff: null,   // staff: {role} or null
+  classrooms: [], children: [], inbox: [], anns: [], students: [],
+  view: 'loading', tab: 'home', stack: [],
+  chat: null,        // {thread_id, student, messages[], guardians[]}
+  filters: { classroom: 'all', unreadOnly: false, q: '', status: 'all' },
+  signedUrls: {}, rt: null, busy: false,
+};
+
+/* ---------------- 起動 ---------------- */
+function getConfig(){
+  let url = CONFIG.SUPABASE_URL, key = CONFIG.SUPABASE_ANON_KEY;
+  if(!url || !key){ try{ const c = JSON.parse(localStorage.getItem('pv_cfg')||'null'); if(c){ url=c.url; key=c.key; } }catch(e){} }
+  return (url && key) ? {url, key} : null;
+}
+async function boot(){
+  applyBrand(hostBrand());
+  const cfg = getConfig();
+  if(!cfg){ S.view='setup'; return render(); }
+  S.sb = supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  S.sb.auth.onAuthStateChange(async (ev, session) => {
+    if(ev === 'PASSWORD_RECOVERY'){ S.session = session; S.view = 'newpass'; return render(); }
+    if(ev === 'SIGNED_OUT'){ applyBrand(hostBrand()); S.session=null; S.profile=null; S.staff=null; S.children=[]; S.view='auth'; S.authMode='login'; stopRealtime(); return render(); }
+  });
+  const { data:{ session } } = await S.sb.auth.getSession();
+  S.session = session;
+  if(!session){ S.view='auth'; S.authMode='login'; return render(); }
+  await afterLogin();
+}
+async function afterLogin(){
+  S.view='loading'; render();
+  const uid = S.session.user.id;
+  let { data: prof } = await S.sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+  if(!prof){ // トリガー前に作られた等
+    await S.sb.rpc('ensure_profile', { p_id: uid });
+    ({ data: prof } = await S.sb.from('profiles').select('*').eq('id', uid).maybeSingle());
+  }
+  S.profile = prof || { id: uid, role:'guardian', display_name: S.session.user.email };
+  const { data: st } = await S.sb.from('staff').select('role').eq('id', uid).maybeSingle();
+  S.staff = st || null;
+  await applyPendingCode();
+  const { data: cls } = await S.sb.from('classrooms').select('*').eq('is_active', true).order('sort_order');
+  S.classrooms = cls || [];
+  if(S.staff){ S.tab='inbox'; await loadInbox(); }
+  else {
+    await loadChildren();
+    applyBrand(brandForChildren(S.children));
+    if(!S.children.length){ const { data: ex } = await S.sb.rpc('staff_exists'); S.noStaffYet = (ex === false); S.view='join'; return render(); }
+    S.tab='home'; await loadAnns();
+  }
+  S.view='main'; render(); startRealtime();
+}
+
+/* ---------------- データ読み込み ---------------- */
+async function loadChildren(){ const { data } = await S.sb.rpc('guardian_home'); S.children = data || []; }
+async function loadInbox(){ const { data } = await S.sb.rpc('staff_inbox'); S.inbox = data || []; }
+async function loadAnns(){ const { data } = await S.sb.rpc('list_announcements', { p_limit: 100 }); S.anns = data || []; }
+async function loadStudents(){ const { data } = await S.sb.from('students').select('*, classrooms(name,sort_order)').neq('status','withdrawn').order('name'); S.students = data || []; }
+async function loadThread(thread_id){
+  const { data: msgs } = await S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('thread_id', thread_id).is('deleted_at', null).order('created_at').limit(500);
+  return msgs || [];
+}
+function unreadTotal(){ return S.staff ? S.inbox.reduce((a,t)=>a+(t.unread||0),0) : S.children.reduce((a,c)=>a+(c.unread||0),0); }
+function unreadAnns(){ return S.anns.filter(a=>!a.is_read).length; }
+
+/* ---------------- Realtime ---------------- */
+function startRealtime(){
+  stopRealtime();
+  S.rt = S.sb.channel('pv-live')
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, async payload => {
+      const m = payload.new;
+      if(S.chat && S.chat.thread_id === m.thread_id){
+        if(S.chat.messages.some(x=>x.id===m.id)) return;
+        // 送信者名と添付を取りに行く
+        const { data } = await S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('id', m.id).maybeSingle();
+        S.chat.messages.push(data || m); renderChatMsgs(true);
+        if(m.sender_id !== S.profile.id) S.sb.rpc('mark_thread_read', { p_thread_id: m.thread_id });
+      } else {
+        if(S.staff) await loadInbox(); else await loadChildren();
+        if(S.view==='main') render();
+        if(m.sender_id !== S.profile.id) notify('新しいメッセージ', m.body);
+      }
+    })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'announcements' }, async () => { await loadAnns(); if(S.view==='main') render(); })
+    .subscribe();
+}
+function stopRealtime(){ if(S.rt){ S.sb.removeChannel(S.rt); S.rt=null; } }
+function notify(title, body){
+  try{ if('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification(title, { body: (body||'').slice(0,80) }); }catch(e){}
+}
+
+/* ---------------- 画面描画 ---------------- */
+function render(){
+  const app = $('#app');
+  const v = S.view;
+  if(v==='loading') app.innerHTML = `<div class="loading"><span class="spin"></span></div>`;
+  else if(v==='setup') app.innerHTML = vSetup();
+  else if(v==='auth') app.innerHTML = vAuth();
+  else if(v==='newpass') app.innerHTML = vNewPass();
+  else if(v==='join') app.innerHTML = vJoin();
+  else if(v==='chat') { app.innerHTML = vChat(); renderChatMsgs(true); }
+  else if(v==='student') app.innerHTML = vStudent();
+  else if(v==='compose') app.innerHTML = vCompose();
+  else app.innerHTML = vMain() + fabHtml();
+}
+function hdr(title, sub, opts={}){
+  return `<div class="hdr">${opts.back?`<button class="back" data-act="back">‹</button>`:`<img class="mark" src="${S.brand.mark}" alt="">`}<h1>${esc(title)}${sub?`<span class="sub">${esc(sub)}</span>`:''}</h1>${opts.right||''}</div>`;
+}
+
+/* --- 初期設定（接続情報） --- */
+function vSetup(){
+  return `<div class="main noTab"><div class="wrap" style="max-width:480px;margin:40px auto">
+    <div class="brand"><img src="${S.brand.logo}" alt="${esc(S.brand.org)}"><div class="app">${S.brand.appHtml}</div></div>
+    <p class="muted center mb">初回セットアップ：Supabase の接続情報を入力してください。</p>
+    <div class="card"><form id="fSetup">
+      <label class="f"><span>Project URL</span><input class="in" name="url" placeholder="https://xxxx.supabase.co" required></label>
+      <label class="f"><span>anon public キー</span><textarea class="in" name="key" placeholder="eyJ..." required></textarea></label>
+      <button class="btn block">保存して開始</button>
+    </form></div>
+    <p class="muted small">この情報はこの端末のブラウザだけに保存されます。公開時は index.html の CONFIG に直接書き込んでください。</p>
+  </div></div>`;
+}
+
+/* --- ログイン / 新規登録 --- */
+function vAuth(){
+  const m = S.authMode || 'login';
+  const tabs = `<div class="seg"><button class="${m==='login'?'on':''}" data-act="authmode" data-v="login">ログイン</button><button class="${m==='signup'?'on':''}" data-act="authmode" data-v="signup">新規登録</button></div>`;
+  let body='';
+  if(m==='login') body = `<form id="fLogin">
+      <label class="f"><span>メールアドレス</span><input class="in" name="email" type="email" autocomplete="email" required></label>
+      <label class="f"><span>パスワード</span><input class="in" name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn block">ログイン</button>
+      <p class="center mt"><a href="#" data-act="authmode" data-v="reset" class="small">パスワードを忘れた方</a></p></form>`;
+  else if(m==='signup') body = `<form id="fSignup">
+      <label class="f"><span>お名前（例：山田 花子）</span><input class="in" name="name" required></label>
+      <label class="f"><span>メールアドレス</span><input class="in" name="email" type="email" autocomplete="email" required></label>
+      <label class="f"><span>パスワード（8文字以上）</span><input class="in" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+      <label class="f"><span>招待コード（塾から受け取った8桁。あとからでも入力できます）</span><input class="in" name="code" placeholder="例: ABCD2345" style="text-transform:uppercase"></label>
+      <button class="btn block">登録する</button></form>`;
+  else body = `<form id="fReset">
+      <p class="muted small">登録したメールアドレスに、パスワード再設定のリンクを送ります。</p>
+      <label class="f"><span>メールアドレス</span><input class="in" name="email" type="email" required></label>
+      <button class="btn block">送信</button>
+      <p class="center mt"><a href="#" data-act="authmode" data-v="login" class="small">ログインに戻る</a></p></form>`;
+  return `<div class="main noTab"><div class="auth-wrap">
+    <div class="brand"><img src="${S.brand.logo}" alt="${esc(S.brand.org)}"><div class="app">${S.brand.appHtml}</div><div class="org">${esc(S.brand.org)} 連絡アプリ</div></div>
+    ${tabs}<div class="card"><div id="authMsg"></div>${body}</div>
+  </div></div>`;
+}
+function vNewPass(){
+  return `<div class="main noTab"><div class="wrap" style="max-width:440px;margin:40px auto"><div class="card"><h2>新しいパスワード</h2>
+    <form id="fNewPass"><label class="f"><span>新しいパスワード（8文字以上）</span><input class="in" name="password" type="password" minlength="8" required></label><button class="btn block">変更する</button></form></div></div></div>`;
+}
+
+/* --- 招待コード入力（保護者・子ども未登録） --- */
+function vJoin(){
+  return `${hdr(S.brand.app)}<div class="main noTab"><div class="wrap" style="max-width:440px;margin:0 auto">
+    <div class="card"><h2>お子さまを登録</h2><p class="muted small">塾から受け取った <b>招待コード（8桁）</b> を入力してください。兄弟姉妹がいる場合は、あとから設定画面で追加できます。</p>
+      <div id="joinMsg"></div>
+      <form id="fJoin"><label class="f"><span>招待コード</span><input class="in" name="code" placeholder="例: ABCD2345" style="text-transform:uppercase;font-size:18px;letter-spacing:2px" required></label>
+      <button class="btn block">登録する</button></form></div>
+    ${S.noStaffYet ? `<div class="card"><h2>塾のスタッフの方へ</h2><p class="muted small">まだ管理者が登録されていません。このアカウントを最初の管理者にする場合は下のボタンを押してください（1回だけ有効）。</p><button class="btn sec block" data-act="claimAdmin">このアカウントを最初の管理者にする</button></div>` : ''}
+    <p class="center mt"><button class="btn ghost" data-act="logout">ログアウト</button></p>
+  </div></div>`;
+}
+
+/* --- メイン（タブ） --- */
+function vMain(){
+  const t = S.tab;
+  let title = S.brand.app, sub='', body='', right='';
+  if(S.staff){
+    if(t==='inbox'){ title='メッセージ'; body=vInbox(); }
+    else if(t==='anns'){ title='お知らせ'; body=vAnns(); right=`<button data-act="compose">＋ 作成</button>`; }
+    else if(t==='students'){ title='生徒'; body=vStudents(); right=`<button data-act="addStudent">＋ 追加</button>`; }
+    else { title='設定'; body=vSettings(); }
+  } else {
+    if(t==='home'){ title='お知らせ'; sub=S.brand.org; body=vAnns(); }
+    else if(t==='msgs'){ title='メッセージ'; body=vChildren(); }
+    else { title='設定'; body=vSettings(); }
+  }
+  return `${hdr(title, sub, {right})}<div class="main">${body}</div>${vTabs()}`;
+}
+function vTabs(){
+  const un = unreadTotal(), ua = unreadAnns();
+  const b = (id, ic, label, badge) => `<button class="${S.tab===id?'on':''}" data-act="tab" data-v="${id}"><span class="ic">${ic}</span>${label}${badge?`<span class="badge">${badge}</span>`:''}</button>`;
+  return `<div class="tabs">${ S.staff
+    ? b('inbox','💬','メッセージ',un) + b('anns','📣','お知らせ') + b('students','👥','生徒') + b('settings','⚙️','設定')
+    : b('home','📣','お知らせ',ua) + b('msgs','💬','メッセージ',un) + b('settings','⚙️','設定') }</div>`;
+}
+
+/* --- お知らせ一覧（共通） --- */
+function vAnns(){
+  if(!S.anns.length) return `<div class="empty">お知らせはまだありません</div>`;
+  const items = S.anns.map(a => `<div class="item ${a.is_read||S.staff?'':'unread'}" data-act="openAnn" data-id="${a.id}">
+      <div class="grow"><div class="t">${a.pinned?'<span class="pin">📌</span> ':''}${esc(a.title)}${!a.is_read&&!S.staff?' <span class="dot"></span>':''}</div>
+      <div class="d">${esc(a.body.replace(/\n/g,' '))}</div>
+      <div class="small muted">${S.staff?`${esc(a.targets_label)} ・ 既読 ${a.read_count}人 ・ `:''}${new Date(a.publish_at)>new Date()?'<span class="pill warn">予約 '+fmtDT(a.publish_at)+'</span>':fmtTime(a.publish_at)}</div></div></div>`).join('');
+  return `<div class="wrap"><div class="list">${items}</div></div>`;
+}
+
+/* --- 保護者：子ども一覧 --- */
+function vChildren(){
+  const items = S.children.map(c => `<div class="item ${c.unread?'unread':''}" data-act="openThread" data-id="${c.thread_id}" data-sid="${c.student_id}">
+      <div class="av">${esc(initial(c.student_name))}</div>
+      <div class="grow"><div class="t">${esc(c.student_name)} <span class="muted small" style="font-weight:400">${esc(c.grade||'')} ${esc(c.classroom_name)}教室</span></div>
+      <div class="d">${esc(c.last_preview||'まだメッセージはありません')}</div></div>
+      <div class="meta">${fmtTime(c.last_message_at)}<br>${c.unread?`<span class="badge">${c.unread}</span>`:''}</div></div>`).join('');
+  return `<div class="wrap"><div class="list">${items}</div><p class="muted small center">兄弟姉妹の追加は「設定」→「お子さまを追加」から</p></div>`;
+}
+
+/* --- スタッフ：受信箱 --- */
+function vInbox(){
+  const f = S.filters;
+  const chips = [`<button class="chip ${f.classroom==='all'?'on':''}" data-act="fcls" data-v="all">すべて</button>`]
+    .concat(S.classrooms.map(c=>`<button class="chip ${f.classroom===c.id?'on':''}" data-act="fcls" data-v="${c.id}">${esc(c.name)}</button>`)).join('');
+  const st = f.status || 'all';
+  let list = S.inbox.filter(t => (f.classroom==='all'||t.classroom_id===f.classroom) && (st==='all' || (st==='todo' ? t.status!=='resolved' : t.status===st)) && (!f.unreadOnly || t.unread>0 || t.last_sender_type==='guardian') && (!f.q || t.student_name.includes(f.q)));
+  const cnt = k => S.inbox.filter(t => (f.classroom==='all'||t.classroom_id===f.classroom) && t.status===k).length;
+  const stChips = `<div class="chips" style="padding-top:2px">
+      <button class="chip ${st==='all'?'on':''}" data-act="fstatus" data-v="all">すべて</button>
+      <button class="chip ${st==='open'?'on':''}" data-act="fstatus" data-v="open">未対応 ${cnt('open')}</button>
+      <button class="chip ${st==='in_progress'?'on':''}" data-act="fstatus" data-v="in_progress">対応中 ${cnt('in_progress')}</button>
+      <button class="chip ${st==='resolved'?'on':''}" data-act="fstatus" data-v="resolved">解決済</button></div>`;
+  const items = list.map(t => `<div class="item ${t.unread?'unread':''} ${t.status==='resolved'?'done':''}" data-act="openThread" data-id="${t.thread_id}" data-sid="${t.student_id}">
+      <div class="av">${esc(initial(t.student_name))}</div>
+      <div class="grow"><div class="t"><span class="st ${STATUS[t.status||'resolved'].cls}">${STATUS[t.status||'resolved'].ja}</span>${esc(t.student_name)} <span class="muted small" style="font-weight:400">${esc(t.grade||'')} ${esc(t.classroom_name)}</span>${t.guardian_count===0?' <span class="pill gray">保護者未登録</span>':''}</div>
+      <div class="d">${esc(t.last_preview||'—')}</div>${t.assignee_name?`<div class="muted small">担当: ${esc(t.assignee_name)}</div>`:''}</div>
+      <div class="meta">${fmtTime(t.last_message_at)}<br>${t.unread?`<span class="badge">${t.unread}</span>`:''}</div></div>`).join('');
+  return `<div class="chips">${chips}</div>${stChips}
+    <div class="row" style="padding:6px 12px"><input class="in grow" placeholder="生徒名で検索" data-act="fq" value="${esc(f.q)}"><button class="chip ${f.unreadOnly?'on':''}" data-act="funread">未読</button><button class="chip" data-act="absList">欠席・遅刻 一覧</button></div>
+    <div class="wrap" style="padding-top:4px">${items?`<div class="list">${items}</div>`:`<div class="empty">該当するスレッドはありません</div>`}</div>`;
+}
+
+/* --- スタッフ：欠席・遅刻・早退 一覧（今日〜2週間） --- */
+async function sheetAbsList(){
+  openSheet(`<h3>欠席・遅刻・早退の連絡</h3><div class="loading"><span class="spin"></span></div>`);
+  const { data, error } = await S.sb.rpc('list_absences', { p_from: todayISO(0), p_to: todayISO(14) });
+  if(error) return toast(error.message);
+  const lab = {absent:'欠席',late:'遅刻',early:'早退'};
+  const f = S.filters; const rows = (data||[]).filter(a => f.classroom==='all' || S.classrooms.find(c=>c.id===f.classroom)?.name===a.classroom_name);
+  const byDate = {}; rows.forEach(a => { (byDate[a.target_date] ||= []).push(a); });
+  const body = Object.keys(byDate).sort().map(d => `<div class="sect">${fmtDateFull(d+'T00:00:00')}</div><div class="list">${byDate[d].map(a=>`<div class="item" data-act="openThreadOfStudent" data-id="${a.student_id}"><span class="pill ${a.kind==='absent'?'':'warn'}">${lab[a.kind]}</span><div class="grow"><div class="t">${esc(a.student_name)} <span class="muted small" style="font-weight:400">${esc(a.grade||'')} ${esc(a.classroom_name)}</span></div><div class="d">${esc(a.reason||'')}${a.detail?'　'+esc(a.detail):''}</div></div></div>`).join('')}</div>`).join('');
+  openSheet(`<h3>欠席・遅刻・早退の連絡 <span class="muted small">今日〜2週間</span></h3>${body || '<p class="muted small">この期間の連絡はありません</p>'}`);
+}
+
+/* --- スタッフ：生徒一覧 --- */
+function vStudents(){
+  if(!S.students.length) return `<div class="empty">生徒が登録されていません。右上の「＋ 追加」から登録してください。</div>`;
+  const q = S.filters.sq || '';
+  const byCls = {};
+  S.students.filter(s=>!q||s.name.includes(q)||(s.name_kana||'').includes(q)).forEach(s => { const k = s.classrooms?.name || '未設定'; (byCls[k] ||= []).push(s); });
+  const order = S.classrooms.map(c=>c.name);
+  const groups = Object.keys(byCls).sort((a,b)=>order.indexOf(a)-order.indexOf(b)).map(k => `<div class="sect">${esc(k)}教室（${byCls[k].length}）</div><div class="list">` +
+    byCls[k].map(s=>`<div class="item" data-act="openStudent" data-id="${s.id}"><div class="av">${esc(initial(s.name))}</div><div class="grow"><div class="t">${esc(s.name)}</div><div class="d">${esc(s.grade||'')} ${esc(s.school||'')}</div></div><div class="meta">${s.status==='suspended'?'<span class="pill gray">休会</span>':''}</div></div>`).join('') + `</div>`).join('');
+  return `<div class="row" style="padding:10px 12px 0"><input class="in grow" placeholder="生徒名で検索" data-act="sq" value="${esc(q)}"></div><div class="wrap">${groups}</div>`;
+}
+
+/* --- 設定 --- */
+function vSettings(){
+  const isAdmin = S.staff && ['admin','manager'].includes(S.staff.role);
+  return `<div class="wrap">
+    <div class="card"><h2>アカウント</h2>
+      <form id="fName"><label class="f"><span>表示名</span><input class="in" name="name" value="${esc(S.profile.display_name)}"></label><button class="btn sm sec">表示名を変更</button></form>
+      <p class="muted small mt">${esc(S.session.user.email)} ・ ${S.staff?`スタッフ（${S.staff.role}）`:'保護者'}</p>
+      <button class="btn sm ghost" data-act="pushPerm">🔔 通知を許可する</button>
+    </div>
+    ${!S.staff?`<div class="card"><h2>お子さまを追加</h2><form id="fJoin2" class="row"><input class="in grow" name="code" placeholder="招待コード" style="text-transform:uppercase" required><button class="btn">追加</button></form></div>`:''}
+    ${isAdmin?`<div class="card"><h2>スタッフ管理</h2><div id="staffList" class="muted small">読み込み中…</div>
+      <form id="fAddStaff" class="mt"><label class="f"><span>スタッフを追加（先にこのアプリで新規登録してもらったメールアドレス）</span><div class="row"><input class="in grow" name="email" type="email" placeholder="mail@example.com" required><select class="in" name="role" style="width:auto"><option value="teacher">講師</option><option value="manager">教室長</option><option value="admin">管理者</option></select></div></label><button class="btn sm">追加</button></form>
+      <p class="muted small mt">スタッフは全員、全教室のトークを閲覧できます。特定の教室だけに絞りたい講師がいる場合は「担当教室」を設定してください（設定した教室だけが見えるようになります）。</p></div>`:''}
+    <div class="card"><h2>このアプリについて</h2><p class="muted small">${esc(S.brand.app)} v${CONFIG.VERSION}<br>スマホの「ホーム画面に追加」で、アプリのように使えます。<br>iPhone: Safariの共有ボタン → ホーム画面に追加 ／ Android: Chromeのメニュー → ホーム画面に追加</p></div>
+    <button class="btn danger block" data-act="logout">ログアウト</button>
+  </div>`;
+}
+async function fillStaffList(){
+  const el = $('#staffList'); if(!el) return;
+  const { data, error } = await S.sb.rpc('list_staff');
+  if(error){ el.textContent = error.message; return; }
+  const roleJa = {admin:'管理者',manager:'教室長',teacher:'講師'};
+  el.innerHTML = `<table class="tbl"><tr><th>名前</th><th>権限</th><th>担当教室</th><th></th></tr>` + (data||[]).map(s=>`<tr><td>${esc(s.display_name)}<br><span class="muted">${esc(s.email)}</span></td><td>${roleJa[s.role]||s.role}</td><td>${s.role==='teacher'?`<a href="#" data-act="editCls" data-id="${s.id}" data-name="${esc(s.display_name)}">${esc(s.classrooms||'全教室（未設定）')} ✎</a>`:'全教室'}</td><td>${s.id!==S.profile.id?`<a href="#" data-act="rmStaff" data-id="${s.id}" class="small" style="color:var(--danger)">解除</a>`:''}</td></tr>`).join('') + `</table>`;
+}
+
+/* --- チャット --- */
+function vChat(){
+  const c = S.chat, st = c.student;
+  const sub = S.staff ? `${st.grade||''} ${st.classroom_name||''}教室${c.guardians?.length?` ・ 保護者: ${c.guardians.map(g=>g.display_name).join('、')}`:' ・ 保護者未登録'}` : `${st.classroom_name||''}教室`;
+  const right = S.staff ? `<button data-act="openStudent" data-id="${st.student_id}">詳細</button>` : '';
+  const tst = c.status || 'resolved';
+  const statusBar = S.staff ? `<div class="statusbar">
+      <span class="muted small">状況</span>
+      ${Object.entries(STATUS).map(([k,v])=>`<button class="stbtn ${v.cls} ${tst===k?'on':''}" data-act="setStatus" data-v="${k}">${v.ja}</button>`).join('')}
+      <span class="grow"></span>
+      <label class="muted small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="resolveAfter" ${tst!=='resolved'?'checked':''}>送信後に解決済にする</label>
+    </div>` : '';
+  const quick = S.staff ? '' : `<div class="quick"><button class="chip" data-act="absence" data-v="absent">🏠 欠席連絡</button><button class="chip" data-act="absence" data-v="late">⏰ 遅刻連絡</button><button class="chip" data-act="absence" data-v="early">🚶 早退連絡</button></div>`;
+  return `<div class="chat">${hdr(st.student_name+' さん', sub, {back:true, right})}${statusBar}
+    <div class="msgs" id="msgs"></div>
+    ${quick}
+    <div class="compose"><input type="file" id="fileIn" class="hide" accept="image/*,application/pdf"><button data-act="attach" title="添付">📎</button><textarea id="msgIn" rows="1" placeholder="メッセージを入力"></textarea><button class="send" data-act="send">➤</button></div>
+  </div>`;
+}
+function renderChatMsgs(scroll){
+  const el = $('#msgs'); if(!el || !S.chat) return;
+  const me = S.profile.id; let lastDay=''; let html='';
+  for(const m of S.chat.messages){
+    const day = new Date(m.created_at).toDateString();
+    if(day!==lastDay){ html += `<div class="dsep"><span>${fmtDateFull(m.created_at)}</span></div>`; lastDay=day; }
+    if(m.sender_type==='system'){ html += `<div class="m sys"><div class="bub">${esc(m.body)}</div></div>`; continue; }
+    const mine = m.sender_id===me;
+    const cls = mine?'me':'them';
+    const who = (!mine) ? `<div class="who">${esc(m.profiles?.display_name || (m.sender_type==='staff'?S.brand.org:'保護者'))}${m.sender_type==='staff'&&S.staff?'（スタッフ）':''}</div>` : '';
+    let inner = nl2br(m.body);
+    if(m.kind==='file' && m.message_attachments?.length){
+      inner = m.message_attachments.map(a => (a.mime||'').startsWith('image/')
+        ? `<a href="#" data-act="openFile" data-path="${esc(a.storage_path)}"><img data-path="${esc(a.storage_path)}" alt="${esc(a.filename)}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='120'%3E%3C/svg%3E"></a>`
+        : `<a href="#" class="file" data-act="openFile" data-path="${esc(a.storage_path)}">📄 ${esc(a.filename)}</a>`).join('');
+    }
+    const extra = m.kind==='absence'?' absence':(m.kind==='attendance'?' att':'');
+    html += `<div class="m ${cls}"><div>${who}<div class="bub${extra}">${inner}</div></div><div class="tm">${hm(m.created_at)}</div></div>`;
+  }
+  if(!S.chat.messages.length) html = `<div class="empty">まだメッセージはありません。${S.staff?'保護者へ最初のメッセージを送りましょう。':'ご質問・ご連絡はこちらからどうぞ。'}</div>`;
+  el.innerHTML = html;
+  $$('img[data-path]', el).forEach(async img => { img.src = await signedUrl(img.dataset.path); });
+  if(scroll) el.scrollTop = el.scrollHeight;
+}
+async function signedUrl(path){
+  const c = S.signedUrls[path]; if(c && c.exp > Date.now()) return c.url;
+  const { data } = await S.sb.storage.from('attachments').createSignedUrl(path, 3600);
+  if(data){ S.signedUrls[path] = { url: data.signedUrl, exp: Date.now()+3500*1000 }; return data.signedUrl; }
+  return '';
+}
+async function openThread(thread_id, student_id){
+  S.view='loading'; render();
+  let student, guardians=[];
+  if(S.staff){ student = S.inbox.find(t=>t.thread_id===thread_id); const { data } = await S.sb.rpc('list_guardians', { p_student_id: student_id }); guardians = data||[]; }
+  else student = S.children.find(c=>c.thread_id===thread_id);
+  const messages = await loadThread(thread_id);
+  S.chat = { thread_id, student, guardians, messages, status: student?.status || 'resolved' };
+  S.stack.push('main'); S.view='chat'; render();
+  await S.sb.rpc('mark_thread_read', { p_thread_id: thread_id });
+  if(S.staff) loadInbox(); else loadChildren();
+}
+async function sendMessage(){
+  const ta = $('#msgIn'); const body = ta.value.trim(); if(!body || S.busy) return;
+  S.busy = true; ta.value=''; ta.style.height='auto';
+  const { error } = await S.sb.from('messages').insert({ thread_id: S.chat.thread_id, sender_id: S.profile.id, sender_type: S.staff?'staff':'guardian', body });
+  S.busy=false;
+  if(error){ ta.value = body; toast('送信できませんでした: '+error.message); return; }
+  if(S.staff && $('#resolveAfter')?.checked && S.chat.status!=='resolved') await setThreadStatus('resolved', true);
+}
+async function setThreadStatus(status, silent){
+  if(!S.chat) return;
+  const { error } = await S.sb.rpc('set_thread_status', { p_thread_id: S.chat.thread_id, p_status: status, p_assignee: status==='in_progress' ? S.profile.id : null, p_keep_assignee: true });
+  if(error) return toast(error.message);
+  S.chat.status = status; const t = S.inbox.find(x=>x.thread_id===S.chat.thread_id); if(t){ t.status = status; if(status==='in_progress' && !t.assignee_name) t.assignee_name = S.profile.display_name; }
+  $$('.stbtn').forEach(b => b.classList.toggle('on', b.dataset.v===status)); const ra=$('#resolveAfter'); if(ra) ra.checked = status!=='resolved';
+  if(!silent) toast(STATUS[status].ja + ' にしました');
+}
+async function sendFile(file){
+  if(!file) return; if(file.size > 20*1024*1024) return toast('20MB以下のファイルにしてください');
+  toast('アップロード中…');
+  const safe = file.name.replace(/[^\w.\-]+/g,'_');
+  const path = `threads/${S.chat.thread_id}/${Date.now()}_${safe}`;
+  const up = await S.sb.storage.from('attachments').upload(path, file, { contentType: file.type });
+  if(up.error) return toast('アップロード失敗: '+up.error.message);
+  const { data: msg, error } = await S.sb.from('messages').insert({ thread_id: S.chat.thread_id, sender_id: S.profile.id, sender_type: S.staff?'staff':'guardian', kind:'file', body: file.name }).select().single();
+  if(error) return toast('送信失敗: '+error.message);
+  await S.sb.from('message_attachments').insert({ message_id: msg.id, storage_path: path, filename: file.name, mime: file.type, size_bytes: file.size });
+  // realtime で届いたときに添付が無い場合があるので手動で反映
+  const idx = S.chat.messages.findIndex(m=>m.id===msg.id);
+  const full = { ...msg, profiles:{display_name:S.profile.display_name}, message_attachments:[{ storage_path: path, filename: file.name, mime: file.type }] };
+  if(idx>=0) S.chat.messages[idx]=full; else S.chat.messages.push(full);
+  renderChatMsgs(true);
+}
+
+/* --- 欠席・遅刻・早退 連絡シート --- */
+const STATUS = { open:{ja:'未対応',cls:'st-open'}, in_progress:{ja:'対応中',cls:'st-prog'}, resolved:{ja:'解決済',cls:'st-done'} };
+const ABS_REASONS = ['部活/習い事のため','学校行事/地域行事','体調不良','ご家庭の都合','その他'];
+function sheetAbsence(kind, student_id){
+  kind = kind || 'absent';
+  const kids = S.children || [];
+  const sid = student_id || S.chat?.student?.student_id || kids[0]?.student_id || '';
+  const kidSel = kids.length > 1
+    ? `<label class="f"><span>お子さま</span><select class="in" name="student_id">${kids.map(c=>`<option value="${c.student_id}" ${c.student_id===sid?'selected':''}>${esc(c.student_name)}（${esc(c.classroom_name)}）</option>`).join('')}</select></label>`
+    : `<input type="hidden" name="student_id" value="${sid}">`;
+  openSheet(`<h3>欠席・遅刻・早退のご連絡</h3><form id="fAbs">
+    <label class="f"><span>種別</span><select class="in" name="kind">
+      <option value="absent" ${kind==='absent'?'selected':''}>欠席</option>
+      <option value="late" ${kind==='late'?'selected':''}>遅刻</option>
+      <option value="early" ${kind==='early'?'selected':''}>早退</option></select></label>
+    ${kidSel}
+    <div class="row" style="align-items:flex-start">
+      <label class="f grow"><span>日付（From）</span><input class="in" type="date" name="date_from" value="${todayISO(0)}" required></label>
+      <label class="f grow"><span>日付（To）</span><input class="in" type="date" name="date_to" value="${todayISO(0)}"></label>
+    </div>
+    <label class="f"><span>理由</span><select class="in" name="reason">${ABS_REASONS.map(r=>`<option>${r}</option>`).join('')}</select></label>
+    <label class="f"><span>補足（任意）　例：19時ごろ到着予定／病院のため</span><textarea class="in" name="detail" style="min-height:64px"></textarea></label>
+    <div class="row"><button class="btn sec grow" type="submit" name="more" value="1">続けて入力する</button><button class="btn grow" type="submit">送信する</button></div>
+  </form>`);
+  const f = $('#fAbs'); if(f){ const from=f.querySelector('[name=date_from]'), to=f.querySelector('[name=date_to]');
+    from.addEventListener('change', ()=>{ if(!to.value || to.value < from.value) to.value = from.value; });
+    f.querySelectorAll('button[type=submit]').forEach(b=>b.addEventListener('click', ()=>{ f.dataset.more = b.name==='more' ? '1' : ''; })); }
+}
+
+/* --- 保護者：連絡する（フローティングボタン） --- */
+function fabHtml(){
+  if(S.staff || S.view!=='main' || !(S.tab==='home'||S.tab==='msgs') || !(S.children||[]).length) return '';
+  return `<div class="fab"><button class="fab-main" data-act="fabToggle">＋ 連絡する</button>
+    <div class="fab-menu hide" id="fabMenu">
+      <button data-act="fabAbs">欠席／遅刻／早退</button>
+      <button data-act="fabMsg">その他のメッセージ</button></div></div>`;
+}
+
+/* --- お知らせ詳細 --- */
+async function openAnn(id){
+  const a = S.anns.find(x=>x.id===id); if(!a) return;
+  openSheet(`<h3>${a.pinned?'📌 ':''}${esc(a.title)}</h3><p class="muted small">${fmtDT(a.publish_at)}${S.staff?` ・ 配信先: ${esc(a.targets_label)} ・ 既読 ${a.read_count}人`:''}</p><div class="ann-body">${nl2br(a.body)}</div>
+    ${S.staff?`<div class="row mt"><button class="btn sm sec" data-act="editAnn" data-id="${a.id}">編集</button><button class="btn sm danger" data-act="delAnn" data-id="${a.id}">削除</button></div>`:''}`);
+  if(!S.staff && !a.is_read){ await S.sb.rpc('mark_announcement_read', { p_id: id }); a.is_read=true; }
+}
+
+/* --- お知らせ作成/編集 --- */
+function vCompose(){
+  const a = S.editAnn || {};
+  const tg = S.editTargets || { classrooms: [], grade:'', student_id:'' };
+  return `${hdr(a.id?'お知らせを編集':'お知らせを作成','',{back:true})}<div class="main noTab"><div class="wrap"><form id="fAnn" class="card">
+    <label class="f"><span>タイトル</span><input class="in" name="title" value="${esc(a.title||'')}" required></label>
+    <label class="f"><span>本文</span><textarea class="in" name="body" style="min-height:160px" required>${esc(a.body||'')}</textarea></label>
+    <label class="f"><span>配信先の教室（未選択＝全教室）</span><div>${S.classrooms.map(c=>`<label class="chk ${tg.classrooms.includes(c.id)?'on':''}"><input type="checkbox" name="cls" value="${c.id}" ${tg.classrooms.includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')}</div></label>
+    <label class="f"><span>学年で絞る（任意）</span><select class="in" name="grade"><option value="">絞らない</option>${GRADES.map(g=>`<option ${tg.grade===g?'selected':''}>${g}</option>`).join('')}</select></label>
+    <label class="f"><span>特定の生徒だけに送る（任意。指定すると上の教室・学年は無視）</span><select class="in" name="student"><option value="">指定しない</option>${S.students.map(s=>`<option value="${s.id}" ${tg.student_id===s.id?'selected':''}>${esc(s.name)}（${esc(s.classrooms?.name||'')}）</option>`).join('')}</select></label>
+    <div class="row mb"><label class="chk ${a.pinned?'on':''}"><input type="checkbox" name="pinned" ${a.pinned?'checked':''}>📌 ピン留め（上部に固定）</label></div>
+    <label class="f"><span>配信日時（未来にすると予約投稿）</span><input class="in" type="datetime-local" name="publish_at" value="${toLocalInput(a.publish_at)}"></label>
+    <label class="f"><span>表示終了（任意）</span><input class="in" type="datetime-local" name="expires_at" value="${a.expires_at?toLocalInput(a.expires_at):''}"></label>
+    <button class="btn block">${a.id?'保存する':'配信する'}</button></form></div></div>`;
+}
+async function saveAnn(form){
+  const fd = new FormData(form);
+  const rec = { title: fd.get('title').trim(), body: fd.get('body').trim(), pinned: !!fd.get('pinned'),
+    publish_at: new Date(fd.get('publish_at')).toISOString(), expires_at: fd.get('expires_at')?new Date(fd.get('expires_at')).toISOString():null, created_by: S.profile.id };
+  let id = S.editAnn?.id;
+  if(id){ const { error } = await S.sb.from('announcements').update(rec).eq('id', id); if(error) return toast(error.message); await S.sb.from('announcement_targets').delete().eq('announcement_id', id); }
+  else { const { data, error } = await S.sb.from('announcements').insert(rec).select().single(); if(error) return toast(error.message); id = data.id; }
+  const student = fd.get('student'); const grade = fd.get('grade'); const cls = fd.getAll('cls');
+  let targets = [];
+  if(student) targets = [{ announcement_id:id, student_id: student }];
+  else if(cls.length) targets = cls.map(c=>({ announcement_id:id, classroom_id:c, grade: grade||null }));
+  else if(grade) targets = [{ announcement_id:id, grade }];
+  if(targets.length){ const { error } = await S.sb.from('announcement_targets').insert(targets); if(error) return toast(error.message); }
+  toast(S.editAnn?.id?'保存しました':'配信しました'); S.editAnn=null; S.editTargets=null;
+  await loadAnns(); S.view='main'; S.tab='anns'; render();
+}
+
+
+/* 招待コード入りの案内（印刷/PDF）を開く */
+function guideUrl(st, code){
+  const cls = st.classrooms?.name || st.classroom_name || '';
+  const brand = Object.values(BRANDS).find(b=>b.classrooms.includes(cls))?.key || S.brand.key;
+  const q = new URLSearchParams({ code, name: st.name, cls, grade: st.grade||'', brand, print:'1' });
+  return 'guide.html?' + q.toString();
+}
+
+/* --- 生徒詳細 / 追加 --- */
+function vStudent(){
+  const s = S.curStudent; const inv = S.curInvites||[]; const gs = S.curGuardians||[];
+  return `${hdr(s.name, `${s.grade||''} ${s.classrooms?.name||''}教室`, {back:true})}<div class="main noTab"><div class="wrap">
+    <div class="card"><div class="row"><h2 class="grow" style="margin:0">招待コード</h2><button class="btn sm sec" data-act="issueInvite" data-id="${s.id}">＋ 発行</button></div>
+      <p class="muted small">保護者にこのコードを伝えてください（有効期限90日・1コード1人）。父・母それぞれ登録する場合は2つ発行します。</p>
+      ${inv.length?inv.map(i=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span class="code grow">${i.code.slice(0,4)}-${i.code.slice(4)}</span>${i.used_at?`<span class="pill ok">使用済み ${fmtTime(i.used_at)}</span>`:(new Date(i.expires_at)<new Date()?'<span class="pill gray">期限切れ</span>':`<a class="btn sm sec" href="${guideUrl(s, i.code)}" target="_blank" rel="noopener">案内PDF</a> <button class="btn sm ghost" data-act="copy" data-v="${i.code}">コピー</button>`)}</div>`).join(''):'<p class="muted small">まだ発行されていません</p>'}
+    </div>
+    <div class="card"><h2>登録済みの保護者（${gs.length}）</h2>${gs.length?gs.map(g=>`<div class="row" style="padding:6px 0"><div class="grow">${esc(g.display_name)} <span class="muted small">${esc(g.relation)}</span><br><span class="muted small">${esc(g.email)}</span></div><a href="#" data-act="unlinkG" data-gid="${g.id}" data-sid="${s.id}" class="small" style="color:var(--danger)">解除</a></div>`).join(''):'<p class="muted small">まだ保護者が登録していません</p>'}
+      <button class="btn block mt" data-act="openThreadOfStudent" data-id="${s.id}">💬 メッセージを開く</button></div>
+    <form id="fStudent" class="card"><h2>生徒情報</h2>
+      <label class="f"><span>氏名</span><input class="in" name="name" value="${esc(s.name)}" required></label>
+      <label class="f"><span>ふりがな</span><input class="in" name="name_kana" value="${esc(s.name_kana||'')}"></label>
+      <div class="row"><label class="f grow"><span>教室</span><select class="in" name="classroom_id">${S.classrooms.map(c=>`<option value="${c.id}" ${c.id===s.classroom_id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+      <label class="f grow"><span>学年</span><select class="in" name="grade"><option value="">—</option>${GRADES.map(g=>`<option ${s.grade===g?'selected':''}>${g}</option>`).join('')}</select></label></div>
+      <label class="f"><span>学校</span><input class="in" name="school" value="${esc(s.school||'')}"></label>
+      <label class="f"><span>入退室アプリの生徒ID（連携用）</span><input class="in" name="external_id" value="${esc(s.external_id||'')}" placeholder="入退室アプリ側のID／カード番号"></label>
+      <label class="f"><span>状態</span><select class="in" name="status"><option value="active" ${s.status==='active'?'selected':''}>在籍</option><option value="suspended" ${s.status==='suspended'?'selected':''}>休会</option><option value="withdrawn" ${s.status==='withdrawn'?'selected':''}>退会</option></select></label>
+      <label class="f"><span>メモ（スタッフのみ閲覧）</span><textarea class="in" name="note">${esc(s.note||'')}</textarea></label>
+      <button class="btn block">保存</button></form>
+    <div class="card"><h2>入退室の記録</h2><div id="attLog" class="muted small">読み込み中…</div></div>
+  </div></div>`;
+}
+async function openStudent(id){
+  const prevView = S.view; S.view='loading'; render();
+  if(!S.students.length) await loadStudents();
+  const { data: s } = await S.sb.from('students').select('*, classrooms(name,sort_order)').eq('id', id).single();
+  const { data: inv } = await S.sb.from('invites').select('*').eq('student_id', id).order('created_at', { ascending:false });
+  const { data: gs } = await S.sb.rpc('list_guardians', { p_student_id: id });
+  S.curStudent = s; S.curInvites = inv||[]; S.curGuardians = gs||[];
+  if(prevView!=='student') S.stack.push(prevView==='chat'?'chat':'main');
+  S.view='student'; render();
+  const { data: att } = await S.sb.from('attendance_logs').select('*').eq('student_id', id).order('occurred_at', { ascending:false }).limit(30);
+  const el = $('#attLog'); if(el) el.innerHTML = (att&&att.length) ? att.map(a=>`<div>${fmtDT(a.occurred_at)} ${a.kind==='in'?'<span class="pill ok">入室</span>':'<span class="pill gray">退室</span>'} <span class="muted">${esc(a.method)}</span></div>`).join('') : '記録はまだありません（入退室アプリと連携すると、ここに表示され、保護者にも自動通知されます）';
+}
+function sheetAddStudent(){
+  openSheet(`<h3>生徒を追加</h3><form id="fAddStudent">
+    <label class="f"><span>氏名</span><input class="in" name="name" required autofocus></label>
+    <label class="f"><span>ふりがな</span><input class="in" name="kana"></label>
+    <div class="row"><label class="f grow"><span>教室</span><select class="in" name="classroom_id">${S.classrooms.map(c=>`<option value="${c.id}" ${S.filters.classroom===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+    <label class="f grow"><span>学年</span><select class="in" name="grade"><option value="">—</option>${GRADES.map(g=>`<option>${g}</option>`).join('')}</select></label></div>
+    <label class="f"><span>学校</span><input class="in" name="school"></label>
+    <button class="btn block">追加して招待コードを発行</button></form>`);
+}
+
+/* --- シート --- */
+function openSheet(html){ closeSheet(); const ov = document.createElement('div'); ov.className='ov'; ov.id='ov'; ov.innerHTML = `<div class="sheet" style="position:relative"><button class="btn ghost x" data-act="closeSheet">✕</button>${html}</div>`; document.body.appendChild(ov); ov.addEventListener('click', e=>{ if(e.target===ov) closeSheet(); }); }
+function closeSheet(){ const ov=$('#ov'); if(ov) ov.remove(); }
+
+/* ---------------- イベント ---------------- */
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const act = el.dataset.act, v = el.dataset.v, id = el.dataset.id;
+  if(el.tagName==='A') e.preventDefault();
+  switch(act){
+    case 'authmode': S.authMode = v; render(); break;
+    case 'tab': S.tab = v; if(v==='students' && !S.students.length) await loadStudents(); if(v==='anns'||v==='home') await loadAnns(); render(); if(v==='settings') fillStaffList(); break;
+    case 'back': { closeSheet(); const prev = S.stack.pop() || 'main'; if(prev==='main'){ S.chat=null; if(S.staff) await loadInbox(); else await loadChildren(); } S.view = prev; render(); break; }
+    case 'logout': await S.sb.auth.signOut(); break;
+    case 'claimAdmin': { const { error } = await S.sb.rpc('claim_first_admin'); if(error) return toast(error.message); toast('管理者になりました'); await afterLogin(); break; }
+    case 'openThread': closeSheet(); await openThread(id, el.dataset.sid); break;
+    case 'openThreadOfStudent': { closeSheet(); if(!S.inbox.length) await loadInbox(); const t = S.inbox.find(t=>t.student_id===id); if(!t) return toast('スレッドが見つかりません'); S.stack=[]; await openThread(t.thread_id, id); break; }
+    case 'send': await sendMessage(); break;
+    case 'attach': $('#fileIn').click(); break;
+    case 'openFile': { const url = await signedUrl(el.dataset.path); if(url) window.open(url, '_blank'); break; }
+    case 'absence': sheetAbsence(v); break;
+    case 'absList': await sheetAbsList(); break;
+    case 'fstatus': S.filters.status = v; render(); break;
+    case 'setStatus': await setThreadStatus(v); break;
+    case 'fabToggle': { const m=$('#fabMenu'); if(m) m.classList.toggle('hide'); break; }
+    case 'fabAbs': { $('#fabMenu')?.classList.add('hide'); sheetAbsence('absent'); break; }
+    case 'fabMsg': { $('#fabMenu')?.classList.add('hide'); const kids=S.children||[]; if(kids.length===1){ openThread(kids[0].thread_id, kids[0].student_id); } else { openSheet(`<h3>どのお子さまの連絡ですか？</h3><div class="list">${kids.map(c=>`<div class="item" data-act="openThread" data-id="${c.thread_id}" data-sid="${c.student_id}"><div class="av">${esc(initial(c.student_name))}</div><div class="grow"><div class="t">${esc(c.student_name)}</div><div class="d">${esc(c.classroom_name)}教室</div></div></div>`).join('')}</div>`); } break; }
+    case 'openAnn': await openAnn(id); break;
+    case 'compose': if(!S.students.length) await loadStudents(); S.editAnn=null; S.editTargets=null; S.stack.push('main'); S.view='compose'; render(); break;
+    case 'editAnn': { closeSheet(); if(!S.students.length) await loadStudents(); const a = S.anns.find(x=>x.id===id); const { data: tg } = await S.sb.from('announcement_targets').select('*').eq('announcement_id', id);
+      S.editAnn = a; S.editTargets = { classrooms: (tg||[]).filter(t=>t.classroom_id).map(t=>t.classroom_id), grade: (tg||[]).find(t=>t.grade)?.grade||'', student_id: (tg||[]).find(t=>t.student_id)?.student_id||'' };
+      S.stack.push('main'); S.view='compose'; render(); break; }
+    case 'delAnn': if(confirm('このお知らせを削除しますか？')){ const { error } = await S.sb.from('announcements').delete().eq('id', id); if(error) return toast(error.message); closeSheet(); await loadAnns(); render(); } break;
+    case 'fcls': S.filters.classroom = v; render(); break;
+    case 'funread': S.filters.unreadOnly = !S.filters.unreadOnly; render(); break;
+    case 'addStudent': sheetAddStudent(); break;
+    case 'openStudent': await openStudent(id); break;
+    case 'issueInvite': { const w = window.open('', '_blank'); const { data, error } = await S.sb.rpc('issue_invite', { p_student_id: id }); if(error){ if(w) w.close(); return toast(error.message); } toast('招待コードを発行しました'); await openStudent(id); const url = guideUrl(S.curStudent, data); if(w) w.location = url; else window.open(url, '_blank'); break; }
+    case 'copy': try{ await navigator.clipboard.writeText(v); toast('コピーしました: '+v); }catch(e){ prompt('招待コード', v); } break;
+    case 'unlinkG': if(confirm('この保護者との紐づけを解除しますか？')){ const { error } = await S.sb.from('guardian_students').delete().eq('guardian_id', el.dataset.gid).eq('student_id', el.dataset.sid); if(error) return toast(error.message); await openStudent(el.dataset.sid); } break;
+    case 'rmStaff': if(confirm('スタッフ権限を解除しますか？')){ const { error } = await S.sb.rpc('remove_staff', { p_id: id }); if(error) return toast(error.message); fillStaffList(); } break;
+    case 'editCls': { const { data: cur } = await S.sb.from('staff_classrooms').select('classroom_id').eq('staff_id', id); const has = (cur||[]).map(x=>x.classroom_id);
+      openSheet(`<h3>${esc(el.dataset.name)} の担当教室</h3><form id="fStaffCls" data-id="${id}"><div class="mb">${S.classrooms.map(c=>`<label class="chk ${has.includes(c.id)?'on':''}"><input type="checkbox" name="cls" value="${c.id}" ${has.includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')}</div><button class="btn block">保存</button></form>`); break; }
+    case 'pushPerm': if('Notification' in window){ const p = await Notification.requestPermission(); toast(p==='granted'?'通知を許可しました（このタブを開いている間）':'通知は許可されませんでした'); } else toast('この環境では通知に対応していません'); break;
+    case 'closeSheet': closeSheet(); break;
+  }
+});
+document.addEventListener('change', e => {
+  if(e.target.id==='fileIn'){ sendFile(e.target.files[0]); e.target.value=''; }
+  if(e.target.closest('.chk')) e.target.closest('.chk').classList.toggle('on', e.target.checked);
+});
+document.addEventListener('input', e => {
+  if(e.target.dataset.act==='fq'){ S.filters.q = e.target.value; const pos=e.target.selectionStart; render(); const el=$('[data-act=fq]'); el.focus(); el.setSelectionRange(pos,pos); }
+  if(e.target.dataset.act==='sq'){ S.filters.sq = e.target.value; const pos=e.target.selectionStart; render(); const el=$('[data-act=sq]'); el.focus(); el.setSelectionRange(pos,pos); }
+  if(e.target.id==='msgIn'){ e.target.style.height='auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120)+'px'; }
+});
+document.addEventListener('keydown', e => {
+  if(e.target.id==='msgIn' && e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); sendMessage(); }
+});
+document.addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.target, fd = new FormData(f); const msg = (sel, html, cls='err') => { const m=$(sel); if(m) m.innerHTML = `<div class="${cls}">${html}</div>`; };
+  const btn = f.querySelector('button'); if(btn) btn.disabled = true;
+  try{
+    switch(f.id){
+      case 'fSetup': localStorage.setItem('pv_cfg', JSON.stringify({ url: fd.get('url').trim().replace(/\/$/,''), key: fd.get('key').trim() })); location.reload(); break;
+      case 'fLogin': { const { error } = await S.sb.auth.signInWithPassword({ email: fd.get('email').trim(), password: fd.get('password') }); if(error) return msg('#authMsg', 'ログインできませんでした。メールアドレスとパスワードをご確認ください。'); const { data:{ session } } = await S.sb.auth.getSession(); S.session = session; await afterLogin(); break; }
+      case 'fSignup': { const code = (fd.get('code')||'').trim().toUpperCase();
+        const { data, error } = await S.sb.auth.signUp({ email: fd.get('email').trim(), password: fd.get('password'), options: { data: { display_name: fd.get('name').trim() } } });
+        if(error) return msg('#authMsg', esc(error.message));
+        if(!data.session){ if(code) localStorage.setItem('pv_pending_code', code); return msg('#authMsg', '確認メールを送信しました。メール内のリンクを開いてから、ログインしてください。', 'ok-msg'); }
+        S.session = data.session; if(code){ const r = await S.sb.rpc('redeem_invite', { p_code: code }); if(r.error) toast('招待コードエラー: '+r.error.message); }
+        await afterLogin(); break; }
+      case 'fReset': { const { error } = await S.sb.auth.resetPasswordForEmail(fd.get('email').trim(), { redirectTo: location.origin + location.pathname }); msg('#authMsg', error?esc(error.message):'再設定メールを送信しました。メールをご確認ください。', error?'err':'ok-msg'); break; }
+      case 'fNewPass': { const { error } = await S.sb.auth.updateUser({ password: fd.get('password') }); if(error) return toast(error.message); toast('パスワードを変更しました'); await afterLogin(); break; }
+      case 'fJoin': case 'fJoin2': { const { error } = await S.sb.rpc('redeem_invite', { p_code: fd.get('code').trim().toUpperCase() }); if(error){ if(f.id==='fJoin') msg('#joinMsg', esc(error.message)); else toast(error.message); return; } toast('お子さまを登録しました'); await afterLogin(); break; }
+      case 'fName': { const name = fd.get('name').trim(); if(!name) return; const { error } = await S.sb.from('profiles').update({ display_name: name }).eq('id', S.profile.id); if(error) return toast(error.message); S.profile.display_name = name; toast('変更しました'); break; }
+      case 'fAbs': { const sid = fd.get('student_id'); const more = f.dataset.more==='1';
+        const { error } = await S.sb.rpc('submit_absence2', { p_student_id: sid, p_kind: fd.get('kind'), p_date_from: fd.get('date_from'), p_date_to: fd.get('date_to') || fd.get('date_from'), p_reason: fd.get('reason') || null, p_detail: (fd.get('detail')||'').trim() || null });
+        if(error) return toast(error.message);
+        toast('送信しました'); if(S.chat && S.chat.student?.student_id===sid){ S.chat.messages = await loadThread(S.chat.thread_id); renderChatMsgs(true); } else { await loadChildren(); if(S.view==='main') render(); }
+        if(more){ const k = fd.get('kind'); closeSheet(); sheetAbsence(k, sid); } else closeSheet(); break; }
+      case 'fAnn': await saveAnn(f); break;
+      case 'fAddStudent': { const w = window.open('', '_blank'); const { data, error } = await S.sb.rpc('create_student', { p_name: fd.get('name').trim(), p_classroom_id: fd.get('classroom_id'), p_grade: fd.get('grade')||null, p_kana: fd.get('kana').trim()||null, p_school: fd.get('school').trim()||null });
+        if(error){ if(w) w.close(); return toast(error.message); } closeSheet(); await loadStudents(); await loadInbox(); await openStudent(data[0].student_id); toast('追加しました。招待コード: '+data[0].invite_code);
+        const url = guideUrl(S.curStudent, data[0].invite_code); if(w) w.location = url; else window.open(url, '_blank'); break; }
+      case 'fStudent': { const rec = Object.fromEntries(fd.entries()); for(const k of ['name_kana','school','external_id','note','grade']) if(!rec[k]) rec[k]=null;
+        const { error } = await S.sb.from('students').update(rec).eq('id', S.curStudent.id); if(error) return toast(error.message);
+        if(rec.classroom_id !== S.curStudent.classroom_id) await S.sb.from('threads').update({ classroom_id: rec.classroom_id }).eq('student_id', S.curStudent.id);
+        toast('保存しました'); await loadStudents(); await loadInbox(); await openStudent(S.curStudent.id); break; }
+      case 'fAddStaff': { const { error } = await S.sb.rpc('set_staff_by_email', { p_email: fd.get('email').trim(), p_role: fd.get('role') }); if(error) return toast(error.message); toast('追加しました'); f.reset(); fillStaffList(); break; }
+      case 'fStaffCls': { const ids = fd.getAll('cls'); const { error } = await S.sb.rpc('set_staff_classrooms', { p_staff_id: f.dataset.id, p_classroom_ids: ids }); if(error) return toast(error.message); closeSheet(); fillStaffList(); break; }
+    }
+  } finally { if(btn) btn.disabled = false; }
+});
+// メール確認後の初回ログインで、登録時に入力した招待コードを自動適用
+async function applyPendingCode(){ const c = localStorage.getItem('pv_pending_code'); if(c && S.session && !S.staff){ localStorage.removeItem('pv_pending_code'); const { error } = await S.sb.rpc('redeem_invite', { p_code: c }); if(!error) toast('お子さまを登録しました'); } }
+
+document.addEventListener('visibilitychange', async () => { if(!document.hidden && S.view==='main' && S.sb){ if(S.staff) await loadInbox(); else await loadChildren(); await loadAnns(); render(); if(S.tab==='settings') fillStaffList(); } });
+boot();
+</script>
+</body>
+</html>

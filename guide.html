@@ -1,0 +1,74 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>保護者アプリ 登録のご案内</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}
+:root{--c:#c30d23}
+*{box-sizing:border-box}
+html,body{margin:0;background:#e9e9e9}
+body{font-family:"Noto Sans JP","Hiragino Sans",Meiryo,sans-serif;color:#111;font-size:10.5pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px}
+.bar button{border:1px solid var(--c);background:var(--c);color:#fff;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer}
+.bar .sec{background:#fff;color:#111;border-color:#bbb}
+.sheet{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:12mm 16mm 12mm;position:relative;box-shadow:0 1px 6px rgba(0,0,0,.15)}
+.top{border-top:3px solid var(--c);padding-top:6mm;display:flex;align-items:center;justify-content:space-between}
+.top img{height:15mm}.top img.sq{height:22mm}
+.top .t{text-align:right}.top .t .k{font-size:8.5pt;letter-spacing:.3em;color:var(--c);font-weight:700}.top .t .h{font-size:18pt;font-weight:700;letter-spacing:.06em;margin-top:1mm}
+h2{font-size:11pt;letter-spacing:.14em;margin:0 0 3mm;padding-left:3mm;border-left:3px solid var(--c);line-height:1.2}
+.to{margin:4mm 0 1.5mm;font-size:11.5pt;font-weight:700}
+.lead{margin:0 0 4mm;font-size:10pt}
+.grid{display:grid;grid-template-columns:1fr 62mm;gap:7mm;align-items:start}
+.qrbox{border:1px solid #e3e3e3;padding:5mm;text-align:center}.qrbox img{width:46mm;height:46mm;display:block;margin:0 auto 2mm}.qrbox .u{font-size:9pt;word-break:break-all;font-weight:700}.qrbox .s{font-size:8pt;color:#666;margin-top:1mm}
+.code{border:1.5px solid #111;padding:3mm 4mm;margin-top:5mm;text-align:center}
+.code .l{font-size:8.5pt;letter-spacing:.12em;color:var(--c);font-weight:700;text-align:left}
+.code .v{font-family:ui-monospace,Menlo,monospace;font-size:19pt;font-weight:700;letter-spacing:.12em;color:var(--c);margin:2mm 0 1mm;white-space:nowrap}
+.code .n{font-size:7.5pt;color:#666;text-align:left}
+ol.steps{list-style:none;padding:0;margin:0}ol.steps li{display:flex;gap:4mm;padding:2.1mm 0;border-bottom:1px solid #eee}ol.steps li:last-child{border-bottom:0}
+ol.steps .n{flex:0 0 8mm;height:8mm;background:var(--c);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11pt}
+ol.steps .tt{font-weight:700;font-size:10.5pt}ol.steps .d{font-size:9.5pt;color:#333;margin-top:.5mm}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-top:4mm}.box{border:1px solid #e3e3e3;padding:3mm 5mm}.box h3{margin:0 0 2mm;font-size:9.5pt;letter-spacing:.08em;color:var(--c)}.box p{margin:0;font-size:9pt;color:#333}
+.faq{margin-top:4mm}.faq .items{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm 6mm}.faq .it{border-top:1px solid #eee;padding-top:2mm}
+.faq dt{font-weight:700;font-size:9pt}.faq dt::before{content:"Q ";color:var(--c)}.faq dd{margin:.5mm 0 0;font-size:8.5pt;color:#333}
+.foot{position:absolute;left:16mm;right:16mm;bottom:10mm;border-top:1px solid #111;padding-top:3mm;display:flex;justify-content:space-between;align-items:flex-end}
+.foot .c{font-size:9pt}.foot .c b{letter-spacing:.06em}.foot .line{display:inline-block;border-bottom:1px solid #999;min-width:52mm;height:5mm;vertical-align:bottom;margin-left:2mm}.foot .r{font-size:7.5pt;color:#888;text-align:right}
+@media print{.bar{display:none}html,body{background:#fff}.sheet{margin:0;box-shadow:none;width:210mm;min-height:auto;height:297mm;overflow:hidden}}
+@media screen and (max-width:800px){.sheet{width:100%;padding:8mm;min-height:auto}.grid{grid-template-columns:1fr}.faq .items{grid-template-columns:1fr}.foot{position:static;margin-top:8mm}}
+</style></head><body>
+<div class="bar"><span>プリンターで印刷するか、送信先を「PDFに保存」にしてください（iPhoneは共有 → プリント → プレビューを長押しでPDF）</span><span><button class="sec" onclick="history.back()">戻る</button> <button onclick="window.print()">印刷 / PDFに保存</button></span></div>
+<div class="sheet" id="sheet"></div>
+<script>
+const QR={"pavlov": "iVBORw0KGgoAAAANSUhEUgAAAN4AAADeCAIAAADdBSngAAAE4klEQVR4nO3dW27bMAAAwbro/a+cHkBFQRB8rO2Z79hykgUBmhT1+vn5+QU9v29/APg3aRIlTaKkSZQ0iZImUdIkSppESZMoaRIlTaL+jPzQ6/Xa/Tn+Y26Vf+QzP9+5/6qn5/vMveqkkU9o1CRKmkRJkyhpEiVNooZm6E/79savmjnOzYhHjMyI983Z5+bjI2r/U6MmUdIkSppESZMoaRI1OUN/mpuF7VsfX3WtVTP9kZn1yLX2raqPvM+IVTN9oyZR0iRKmkRJkyhpErVshv6O5lbDV82jV32eT2XUJEqaREmTKGkSJU2iPmSGvmp9fORn9q1r3/1+oMaoSZQ0iZImUdIkSppELZuh350V7tuPvere8H2nt+37y9/9nxo1iZImUdIkSppESZOoyRl6ba/1ydXnkye8nfy9av9ToyZR0iRKmkRJkyhpEjU0Q3/HXdN3z3Kfc3fuX2PUJEqaREmTKGkSJU2iJp+HfvIEs31nnj/VZvH71r5P/r/mGDWJkiZR0iRKmkRJk6jcGvqqZ4uvuvqIfbvK7650n3zS3JNRkyhpEiVNoqRJlDSJWraG/jQ3S923Xn93vrnq97r79xn5mVX7B4yaREmTKGkSJU2ipEnUa99q7777tU8+X+zk+er9v/McM3Q+ijSJkiZR0iRKmkQNzdBPujv7XrUaPvKqp5Mnru9beX+yy52PIk2ipEmUNImSJlHLZuj71n9XvfOqV424ez/73Vet+i7CqEmUNImSJlHSJEqaRB19HnrtTPiTq8Zz73xy5b12urtRkyhpEiVNoqRJlDSJmlxDP3kO+b5r7XtG28n96qvc/Rs+GTWJkiZR0iRKmkRJk6jJNfSnfXuk9+3Zru0hv7vPfO5V7kPn60iTKGkSJU2ipEnU5NPWRn5mZDZ3d/V57jPvc/Je/pOz+DlGTaKkSZQ0iZImUdIkatnT1u6q3Rs+8j5PtXceuda+ObtRkyhpEiVNoqRJlDSJ2ngf+oj+1e+uNd89kX7Oqp0SRk2ipEmUNImSJlHSJGrjGvq+k8dOzlv33Wc953u+nTBqEiVNoqRJlDSJkiZRy2boJ2eyJ9eI755lN+LkM8pP/u5GTaKkSZQ0iZImUdIkanKGvmreOnKtp9qJc08n9w/cPctu3yc0ahIlTaKkSZQ0iZImUcuetvZUO/ds1ezy5HcRd3cd3P32xqhJlDSJkiZR0iRKmkQtW0OfvPzBVez+td7xXP19K/hGTaKkSZQ0iZImUdIkavIs97vuzn9XrbzPuXu//8ldB0ZNoqRJlDSJkiZR0iRqaJd77eldd1fwTz5b/O6e/1Xch85HkSZR0iRKmkRJk6jJ+9DvPk3s7mlp+57+dndn/oiT3wYYNYmSJlHSJEqaREmTqGUnxZ18Zvq+q+/7fmDfJxz5mbszfWvofBRpEiVNoqRJlDSJ2niW+11z89a5ufaqNfSRa62y75z2VVc3ahIlTaKkSZQ0iZImUR8yQz+5h3zfiXOrrt7/hCOMmkRJkyhpEiVNoqRJ1LIZ+t07wUesWrPed575yT32/Se7GTWJkiZR0iRKmkRJk6jJGfrdudvJJ5fNvc/cjHjVrHnVtwH7ntE2wqhJlDSJkiZR0iRKmkS95fPQ+QZGTaKkSZQ0iZImUdIkSppESZMoaRIlTaKkSZQ0ifoLonoE0LYM32sAAAAASUVORK5CYII=", "fuji": "iVBORw0KGgoAAAANSUhEUgAAAN4AAADeCAIAAADdBSngAAAE8UlEQVR4nO3dUU7sOBQA0WE0+9/ymwUEPVmWr1M053xD0kDJkklsf/358+cf6Pn37Q8A35MmUdIkSppESZMoaRIlTaKkSZQ0iZImUdIk6r+VL/r6+pr+HH+x8pR/5RM+r7P3c+1d5+bdT/3G5qx8QqMmUdIkSppESZMoaRK1NEN/mns3fm7eujKTXbn7qevM3X1P7W9q1CRKmkRJkyhpEiVNojZn6E+nZtZ793peZ27euveT7n3muXvtXWfFqd+8UZMoaRIlTaKkSZQ0iTo2Q3/XqTnp3jvkczPivXcDPoNRkyhpEiVNoqRJlDSJ+pAZ+tOpmfXcuu9T95p77/1dRk2ipEmUNImSJlHSJOrYDL02K5x7Y3zla/beun9377iVK99k1CRKmkRJkyhpEiVNojZn6LU3q089fT51r6e9WfPNJ+a1v6lRkyhpEiVNoqRJlDSJWpqh156P77m5WnzPu3P/GqMmUdIkSppESZMoaRL1dWoN9dwT2J/4CW+uDa+dh24vdz6cNImSJlHSJEqaRA0+Q6/NW5/m3g+/uep8zrunvxk1iZImUdIkSppESZOopWfo33zbxRXctR3O5/Zyf/fUtrm1/Hs/hVGTKGkSJU2ipEmUNIk69pb7ync99Z8137z7qTfP506IO/V5Vhg1iZImUdIkSppESZOoY6et3ZyPz81/b56HvnL3vevU3rr3ljsfRZpESZMoaRIlTaI216HPzTff3eVs715z56HPnWM+95s/9dcxahIlTaKkSZQ0iZImUUsz9J+4w9vcCvcVtXX6K2q7uxs1iZImUdIkSppESZOol99yrz23vbkr3fO75nZKr61wX2HUJEqaREmTKGkSJU2iBk9b23NzLrly97nd1J9u/r/i1CzeOnR+HWkSJU2ipEmUNIk6dtrazXO4Vrx7ctnT3Ix47hn6zdPxnoyaREmTKGkSJU2ipEnU5gz9mwvF5oB7d3+6eeLYT/wpnIfOryNNoqRJlDSJkiZRx2boSze7+AT21Prxuf8Y1E6ir61VN2oSJU2ipEmUNImSJlGbO8XN7Q82tw95bZ31qevcPHvuaW6mb9QkSppESZMoaRIlTaI2T1vb8+5T7JtP3veufOq/HJ/xdN6oSZQ0iZImUdIkSppELb3lfnNfuLn574qbq85X7n7zdLMVNz+hUZMoaRIlTaKkSZQ0iTp2Hvq7p5vteXc+vnKdd1fTr3AeOr+ONImSJlHSJEqaRB17hr7yXafMvY996jo3Z8Q33fz/iVGTKGkSJU2ipEmUNIm6upf7KbVZ6s0TyVe8exa8vdz5cNIkSppESZMoaRJ1dae4PSs7qt3cwezds8VP3f3m+gLr0Pko0iRKmkRJkyhpErW5Dn1uNndq9frza96dWd988r7i5jv2nqHzUaRJlDSJkiZR0iTq2E5xN9/iPnX3p/6q/L17vTvT9wydjyJNoqRJlDSJkiZRx2bo7zo1R755SvjedU6Z+42durtRkyhpEiVNoqRJlDSJ+pAZ+srM+ububXPv6q+4+V+FOUZNoqRJlDSJkiZR0iRq8LS1PTffIT+16/hPXFG+4t2VC0ZNoqRJlDSJkiZR0iRqc4Z+06l59NPcfx7mziB79034uZ/ryahJlDSJkiZR0iRKmkT9yPPQ+Q2MmkRJkyhpEiVNoqRJlDSJkiZR0iRKmkRJkyhpEvU/Lm0H7l/TXvQAAAAASUVORK5CYII="};
+const BRANDS={pavlov:{org:'学習塾PAVLOV',app:'PAVLOV Connect',k:'PAVLOV CONNECT',logo:'logo.png',sq:false,url:'shinya-nakamatsu.github.io/pavlov-connect',c:'#c30d23'},
+              fuji:{org:'富士学院',app:'FujiGakuin Connect',k:'FUJIGAKUIN CONNECT',logo:'logo-fuji.png',sq:true,url:'shinya-nakamatsu.github.io/fuji-connect',c:'#0f3b7d'}};
+const PHONES={'豊崎':'098-856-5363','仲井真':'098-987-4455','沖尚前':'098-832-0123','富士学院':'098-857-5789','糸満':'098-987-7373','真嘉比':'098-975-9945','小3学園':'098-869-2563','チャンプ':'098-856-5939','新都心':''};
+const p=new URLSearchParams(location.search);
+const b=BRANDS[p.get('brand')]||((location.hostname+location.pathname).includes('fuji')?BRANDS.fuji:BRANDS.pavlov);
+document.documentElement.style.setProperty('--c',b.c);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const code=(p.get('code')||'').toUpperCase(), name=p.get('name')||'', cls=p.get('cls')||'', grade=p.get('grade')||'';
+document.title=`${name?name+'さん ':''}登録のご案内（${b.org}）`;
+document.getElementById('sheet').innerHTML=`
+<div class="top"><img src="${b.logo}" class="${b.sq?'sq':''}" alt="${esc(b.org)}"><div class="t"><div class="k">${b.k}</div><div class="h">保護者アプリ 登録のご案内</div></div></div>
+${name?`<div class="to">${esc(name)} さん${grade?`（${esc(grade)}${cls?'・'+esc(cls)+'教室':''}）`:''} の保護者様</div>`:''}
+<p class="lead">${esc(b.org)}では、塾からのお知らせ・先生とのメッセージ・欠席連絡・入退室のお知らせを、保護者用アプリ「${esc(b.app)}」でお届けします。下の手順で登録をお願いいたします（所要時間 約3分・無料）。</p>
+<div class="grid"><div><h2>登録手順</h2><ol class="steps">
+<li><div class="n">1</div><div><div class="tt">QRコードを読み取り、アプリを開く</div><div class="d">スマートフォンのカメラで右のQRコードを読み取るか、URLを入力してください。アプリのインストールは不要です。</div></div></li>
+<li><div class="n">2</div><div><div class="tt">「新規登録」を押す</div><div class="d">お名前・メールアドレス・パスワード（8文字以上）を入力します。</div></div></li>
+<li><div class="n">3</div><div><div class="tt">招待コードを入力して「登録する」</div><div class="d">右の8桁のコードを入力してください。登録が完了すると、すぐにお子さまの画面が表示されます。</div></div></li>
+<li><div class="n">4</div><div><div class="tt">ホーム画面に追加する（おすすめ）</div><div class="d">次回からアプリのようにワンタップで開けます。方法は下記をご覧ください。</div></div></li>
+</ol></div>
+<div><div class="qrbox"><img src="data:image/png;base64,${QR[b===BRANDS.fuji?'fuji':'pavlov']}" alt="QR"><div class="u">${b.url}</div><div class="s">カメラで読み取ってください</div></div>
+<div class="code"><div class="l">招待コード（8桁）</div><div class="v">${code?esc(code.replace(/^(\w{4})(\w{4})$/,'$1-$2')):'&nbsp;'}</div><div class="n">お子さま1人につき1つ。90日以内にご登録ください。父・母それぞれで登録される場合はコードを2つお渡しします。</div></div></div></div>
+<div class="two"><div class="box"><h3>iPhone の場合</h3><p>Safari でアプリを開く → 画面下の「共有」ボタン（□に↑）→「ホーム画面に追加」→「追加」</p></div><div class="box"><h3>Android の場合</h3><p>Chrome でアプリを開く → 右上のメニュー（︙）→「ホーム画面に追加」→「追加」</p></div></div>
+<div class="faq"><h2>よくあるご質問</h2><div class="items">
+<div class="it"><dt>招待コードを入れずに登録してしまった</dt><dd>ログイン後に「お子さまを登録」画面が出ます。そこでコードを入力してください。</dd></div>
+<div class="it"><dt>兄弟姉妹がいる</dt><dd>1人目の登録後、「設定」→「お子さまを追加」から2人目のコードを入力。1つのアカウントで切り替えて見られます。</dd></div>
+<div class="it"><dt>「招待コードが無効」と表示される</dt><dd>有効期限切れ、または使用済みです。教室までご連絡ください。再発行いたします。</dd></div>
+<div class="it"><dt>パスワードを忘れた</dt><dd>ログイン画面の「パスワードを忘れた方」から、登録メールアドレス宛に再設定リンクをお送りします。</dd></div>
+<div class="it"><dt>欠席・遅刻の連絡はどうする？</dt><dd>お子さまのメッセージ画面の下の「欠席連絡」「遅刻連絡」「早退連絡」ボタンから送れます。</dd></div>
+<div class="it"><dt>通知は届く？</dt><dd>現在はアプリを開いたときに新着が表示されます。プッシュ通知は今後対応予定です。</dd></div>
+</div></div>
+<div class="foot"><div class="c"><b>教室</b>${cls?`　${esc(cls)}${cls==='小3学園'||cls==='富士学院'?'':'教室'}`:'<span class="line"></span>'}　<b>電話</b>${(p.get('tel')||PHONES[cls])?`　${esc(p.get('tel')||PHONES[cls])}`:'<span class="line"></span>'}</div><div class="r">${esc(b.org)}　${esc(b.app)} 登録案内</div></div>`;
+if(p.get('print')==='1') setTimeout(()=>window.print(), 600);
+</script></body></html>

@@ -1,0 +1,24 @@
+{
+  "name": "FujiGakuin Connect",
+  "short_name": "富士学院",
+  "description": "富士学院 保護者連絡アプリ",
+  "start_url": "./index.html?brand=fuji",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon-fuji-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-fuji-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
