@@ -212,7 +212,8 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.5.0',
+  VERSION: '0.6.0',
+  VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
 /* ---------------- ブランド（教室・URLごとにロゴと色を出し分け） ---------------- */
@@ -294,6 +295,7 @@ async function boot(){
   const cfg = getConfig();
   if(!cfg){ S.view='setup'; return render(); }
   S.sb = supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  pushInit();
   S.sb.auth.onAuthStateChange(async (ev, session) => {
     if(ev === 'PASSWORD_RECOVERY'){ S.session = session; S.view = 'newpass'; return render(); }
     if(ev === 'SIGNED_OUT'){ applyBrand(hostBrand()); S.session=null; S.profile=null; S.staff=null; S.children=[]; S.view='auth'; S.authMode='login'; stopRealtime(); return render(); }
@@ -325,6 +327,22 @@ async function afterLogin(){
     S.tab='home'; await loadAnns();
   }
   S.view='main'; render(); startRealtime();
+  if(PUSH.sub) pushSave(PUSH.sub).catch(()=>{});
+  await openFromUrl();
+}
+// 通知タップ（?thread=… / ?ann=…）で該当画面を開く
+async function openFromUrl(){
+  const qp = new URLSearchParams(location.search);
+  const th = qp.get('thread'), an = qp.get('ann');
+  if(!th && !an) return;
+  const keep = qp.get('brand') ? '?brand='+encodeURIComponent(qp.get('brand')) : '';
+  try{ history.replaceState(null, '', location.pathname + keep); }catch(e){}
+  if(th){
+    const t = S.staff ? S.inbox.find(x=>x.thread_id===th) : S.children.find(x=>x.thread_id===th);
+    if(t) await openThread(th, t.student_id);
+  } else if(an){
+    S.tab = S.staff ? 'anns' : 'home'; await loadAnns(); render();
+  }
 }
 
 /* ---------------- データ読み込み ---------------- */
@@ -362,7 +380,80 @@ function startRealtime(){
 }
 function stopRealtime(){ if(S.rt){ S.sb.removeChannel(S.rt); S.rt=null; } }
 function notify(title, body){
+  if(PUSH.sub) return;   // プッシュ通知が有効なら Service Worker 側が出す
   try{ if('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification(title, { body: (body||'').slice(0,80) }); }catch(e){}
+}
+
+/* ---------------- プッシュ通知（Web Push） ---------------- */
+const PUSH = { reg: null, sub: null, supported: ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window) };
+function isStandalone(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function isIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+async function pushInit(){
+  if(!PUSH.supported) return;
+  try{
+    PUSH.reg = await navigator.serviceWorker.register('./sw.js');
+    PUSH.sub = await PUSH.reg.pushManager.getSubscription();
+    navigator.serviceWorker.addEventListener('message', ev => {
+      const m = ev.data || {};
+      if(m.type==='resubscribe' && S.session) pushSubscribe(true);
+      if(m.type==='push' && m.data && !(S.view==='chat' && S.chat && m.data.tag==='thread-'+S.chat.thread_id)) toast((m.data.title||'')+'：'+(m.data.body||'').slice(0,40));
+    });
+    if(S.view==='main') render();
+  }catch(e){ console.warn('sw', e); }
+}
+function pushState(){   // on / off / blocked / ios-install / unsupported
+  if(!PUSH.supported) return (isIOS() && !isStandalone()) ? 'ios-install' : 'unsupported';
+  if(Notification.permission==='denied') return 'blocked';
+  return PUSH.sub ? 'on' : 'off';
+}
+function b64ToU8(s){ const pad='='.repeat((4-s.length%4)%4); const b=atob((s+pad).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b, c=>c.charCodeAt(0)); }
+async function pushSave(sub){
+  const j = sub.toJSON();
+  const { error } = await S.sb.from('push_subscriptions').upsert({ profile_id: S.profile.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_agent: (navigator.userAgent||'').slice(0,200), last_used_at: new Date().toISOString() }, { onConflict: 'endpoint' });
+  if(error) throw error;
+}
+async function pushSubscribe(silent){
+  if(!PUSH.reg){ if(!silent) toast('この環境では通知に対応していません'); return; }
+  const perm = await Notification.requestPermission();
+  if(perm!=='granted'){ if(!silent) toast('通知が許可されませんでした'); render(); return; }
+  try{
+    const opts = { userVisibleOnly: true, applicationServerKey: b64ToU8(CONFIG.VAPID_PUBLIC_KEY) };
+    let sub = await PUSH.reg.pushManager.subscribe(opts);
+    try{ PUSH.sub = sub; await pushSave(sub); }
+    catch(e){ // 別の人がこの端末で登録していた等 → 登録し直す
+      try{ await sub.unsubscribe(); }catch(_){}
+      sub = await PUSH.reg.pushManager.subscribe(opts); PUSH.sub = sub; await pushSave(sub);
+    }
+    if(!silent) toast('通知をオンにしました');
+  }catch(e){ PUSH.sub = null; if(!silent) toast('通知の登録に失敗しました：'+(e.message||e)); }
+  render();
+}
+async function pushUnsubscribe(quiet){
+  if(PUSH.sub){
+    const ep = PUSH.sub.endpoint;
+    try{ await PUSH.sub.unsubscribe(); }catch(e){}
+    try{ await S.sb.from('push_subscriptions').delete().eq('endpoint', ep); }catch(e){}
+    PUSH.sub = null;
+  }
+  if(!quiet){ toast('通知をオフにしました'); render(); }
+}
+function pushSettingsHtml(){
+  const st = pushState();
+  if(st==='on') return `<p class="small mt">🔔 通知：<b>オン</b>（この端末に届きます）</p><button class="btn sm ghost" data-act="pushOff">通知をオフにする</button>`;
+  if(st==='off') return `<p class="small mt">🔔 通知：オフ</p><button class="btn sm" data-act="pushOn">この端末で通知を受け取る</button>`;
+  if(st==='blocked') return `<p class="small mt muted">🔔 通知がブラウザでブロックされています。端末の設定（サイトの通知）で許可してから、もう一度お試しください。</p>`;
+  if(st==='ios-install') return `<p class="small mt muted">🔔 iPhone / iPad で通知を受け取るには、Safari の共有ボタン →「ホーム画面に追加」で追加し、ホーム画面のアイコンから開いてください。そのあと「通知を受け取る」が押せるようになります。</p>`;
+  return `<p class="small mt muted">🔔 この環境では通知に対応していません。</p>`;
+}
+function pushCardHtml(){
+  if(!S.session || S.view!=='main') return '';
+  const st = pushState();
+  if(st!=='off' && st!=='ios-install') return '';
+  try{ if(localStorage.getItem('pv_push_dismiss')==='1') return ''; }catch(e){}
+  const msg = st==='off'
+    ? `<div class="grow"><b>🔔 メッセージの通知を受け取る</b><div class="muted small">LINEのように、新しいメッセージやお知らせが届いたときに通知します。</div></div><button class="btn sm" data-act="pushOn">オンにする</button>`
+    : `<div class="grow"><b>🔔 通知を受け取るには</b><div class="muted small">Safari の共有ボタン →「ホーム画面に追加」→ ホーム画面のアイコンから開くと、通知をオンにできます。</div></div>`;
+  return `<div class="card pushcard row" style="align-items:center;gap:10px">${msg}<button class="btn sm ghost" data-act="pushDismiss" title="閉じる">✕</button></div>`;
 }
 
 /* ---------------- 画面描画 ---------------- */
@@ -378,6 +469,15 @@ function render(){
   else if(v==='student') app.innerHTML = vStudent();
   else if(v==='compose') app.innerHTML = vCompose();
   else app.innerHTML = vMain() + fabHtml();
+  updateAppBadge();
+}
+// ホーム画面アイコンの未読バッジ（対応端末のみ。iPhone はホーム画面に追加したアプリで有効）
+function updateAppBadge(){
+  try{
+    if(!('setAppBadge' in navigator)) return;
+    const n = S.session ? (unreadTotal() + (S.staff ? 0 : unreadAnns())) : 0;
+    if(n > 0) navigator.setAppBadge(n); else navigator.clearAppBadge();
+  }catch(e){}
 }
 function hdr(title, sub, opts={}){
   return `<div class="hdr">${opts.back?`<button class="back" data-act="back">‹</button>`:`<img class="mark" src="${S.brand.mark}" alt="">`}<h1>${esc(title)}${sub?`<span class="sub">${esc(sub)}</span>`:''}</h1>${opts.right||''}</div>`;
@@ -454,7 +554,8 @@ function vMain(){
     else if(t==='msgs'){ title='メッセージ'; body=vChildren(); }
     else { title='設定'; body=vSettings(); }
   }
-  return `${hdr(title, sub, {right})}<div class="main">${body}</div>${vTabs()}`;
+  const banner = (t==='home'||t==='msgs'||t==='inbox') ? pushCardHtml() : '';
+  return `${hdr(title, sub, {right})}<div class="main">${banner?`<div class="wrap" style="padding-bottom:0">${banner}</div>`:''}${body}</div>${vTabs()}`;
 }
 function vTabs(){
   const un = unreadTotal(), ua = unreadAnns();
@@ -538,7 +639,7 @@ function vSettings(){
     <div class="card"><h2>アカウント</h2>
       <form id="fName"><label class="f"><span>表示名</span><input class="in" name="name" value="${esc(S.profile.display_name)}"></label><button class="btn sm sec">表示名を変更</button></form>
       <p class="muted small mt">${esc(S.session.user.email)} ・ ${S.staff?`スタッフ（${S.staff.role}）`:'保護者'}</p>
-      <button class="btn sm ghost" data-act="pushPerm">🔔 通知を許可する</button>
+      ${pushSettingsHtml()}
     </div>
     ${!S.staff?`<div class="card"><h2>お子さまを追加</h2><form id="fJoin2" class="row"><input class="in grow" name="code" placeholder="招待コード" style="text-transform:uppercase" required><button class="btn">追加</button></form></div>`:''}
     ${isAdmin?`<div class="card"><h2>スタッフ管理</h2><div id="staffList" class="muted small">読み込み中…</div>
@@ -794,7 +895,10 @@ document.addEventListener('click', async e => {
     case 'authmode': S.authMode = v; render(); break;
     case 'tab': S.tab = v; if(v==='students' && !S.students.length) await loadStudents(); if(v==='anns'||v==='home') await loadAnns(); render(); if(v==='settings') fillStaffList(); break;
     case 'back': { closeSheet(); const prev = S.stack.pop() || 'main'; if(prev==='main'){ S.chat=null; if(S.staff) await loadInbox(); else await loadChildren(); } S.view = prev; render(); break; }
-    case 'logout': await S.sb.auth.signOut(); break;
+    case 'logout': await pushUnsubscribe(true); await S.sb.auth.signOut(); break;
+    case 'pushOn': await pushSubscribe(false); break;
+    case 'pushOff': await pushUnsubscribe(false); break;
+    case 'pushDismiss': try{ localStorage.setItem('pv_push_dismiss','1'); }catch(e){} render(); break;
     case 'claimAdmin': { const { error } = await S.sb.rpc('claim_first_admin'); if(error) return toast(error.message); toast('管理者になりました'); await afterLogin(); break; }
     case 'openThread': closeSheet(); await openThread(id, el.dataset.sid); break;
     case 'openThreadOfStudent': { closeSheet(); if(!S.inbox.length) await loadInbox(); const t = S.inbox.find(t=>t.student_id===id); if(!t) return toast('スレッドが見つかりません'); S.stack=[]; await openThread(t.thread_id, id); break; }
@@ -824,7 +928,6 @@ document.addEventListener('click', async e => {
     case 'rmStaff': if(confirm('スタッフ権限を解除しますか？')){ const { error } = await S.sb.rpc('remove_staff', { p_id: id }); if(error) return toast(error.message); fillStaffList(); } break;
     case 'editCls': { const { data: cur } = await S.sb.from('staff_classrooms').select('classroom_id').eq('staff_id', id); const has = (cur||[]).map(x=>x.classroom_id);
       openSheet(`<h3>${esc(el.dataset.name)} の担当教室</h3><form id="fStaffCls" data-id="${id}"><div class="mb">${S.classrooms.map(c=>`<label class="chk ${has.includes(c.id)?'on':''}"><input type="checkbox" name="cls" value="${c.id}" ${has.includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')}</div><button class="btn block">保存</button></form>`); break; }
-    case 'pushPerm': if('Notification' in window){ const p = await Notification.requestPermission(); toast(p==='granted'?'通知を許可しました（このタブを開いている間）':'通知は許可されませんでした'); } else toast('この環境では通知に対応していません'); break;
     case 'closeSheet': closeSheet(); break;
   }
 });
