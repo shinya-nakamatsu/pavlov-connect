@@ -212,7 +212,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.6.0',
+  VERSION: '0.6.1',
   VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
@@ -300,9 +300,11 @@ async function boot(){
     if(ev === 'PASSWORD_RECOVERY'){ S.session = session; S.view = 'newpass'; return render(); }
     if(ev === 'SIGNED_OUT'){ applyBrand(hostBrand()); S.session=null; S.profile=null; S.staff=null; S.children=[]; S.view='auth'; S.authMode='login'; stopRealtime(); return render(); }
   });
+  S.recovery = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
   const { data:{ session } } = await S.sb.auth.getSession();
   S.session = session;
   if(!session){ S.view='auth'; S.authMode='login'; return render(); }
+  if(S.recovery){ try{ history.replaceState(null,'',location.pathname); }catch(e){} S.view='newpass'; return render(); }
   await afterLogin();
 }
 async function afterLogin(){
@@ -639,6 +641,7 @@ function vSettings(){
     <div class="card"><h2>アカウント</h2>
       <form id="fName"><label class="f"><span>表示名</span><input class="in" name="name" value="${esc(S.profile.display_name)}"></label><button class="btn sm sec">表示名を変更</button></form>
       <p class="muted small mt">${esc(S.session.user.email)} ・ ${S.staff?`スタッフ（${S.staff.role}）`:'保護者'}</p>
+      <form id="fPass" class="mt"><label class="f"><span>パスワードを変更（8文字以上）</span><input class="in" name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="btn sm sec">パスワードを変更</button></form>
       ${pushSettingsHtml()}
     </div>
     ${!S.staff?`<div class="card"><h2>お子さまを追加</h2><form id="fJoin2" class="row"><input class="in grow" name="code" placeholder="招待コード" style="text-transform:uppercase" required><button class="btn">追加</button></form></div>`:''}
@@ -957,8 +960,9 @@ document.addEventListener('submit', async e => {
         S.session = data.session; if(code){ const r = await S.sb.rpc('redeem_invite', { p_code: code }); if(r.error) toast('招待コードエラー: '+r.error.message); }
         await afterLogin(); break; }
       case 'fReset': { const { error } = await S.sb.auth.resetPasswordForEmail(fd.get('email').trim(), { redirectTo: location.origin + location.pathname }); msg('#authMsg', error?esc(error.message):'再設定メールを送信しました。メールをご確認ください。', error?'err':'ok-msg'); break; }
-      case 'fNewPass': { const { error } = await S.sb.auth.updateUser({ password: fd.get('password') }); if(error) return toast(error.message); toast('パスワードを変更しました'); await afterLogin(); break; }
+      case 'fNewPass': { const { error } = await S.sb.auth.updateUser({ password: fd.get('password') }); if(error) return toast(error.message); toast('パスワードを変更しました'); S.recovery=false; const { data:{ session } } = await S.sb.auth.getSession(); S.session = session; await afterLogin(); break; }
       case 'fJoin': case 'fJoin2': { const { error } = await S.sb.rpc('redeem_invite', { p_code: fd.get('code').trim().toUpperCase() }); if(error){ if(f.id==='fJoin') msg('#joinMsg', esc(error.message)); else toast(error.message); return; } toast('お子さまを登録しました'); await afterLogin(); break; }
+      case 'fPass': { const { error } = await S.sb.auth.updateUser({ password: fd.get('password') }); if(error) return toast(error.message); toast('パスワードを変更しました'); f.reset(); break; }
       case 'fName': { const name = fd.get('name').trim(); if(!name) return; const { error } = await S.sb.from('profiles').update({ display_name: name }).eq('id', S.profile.id); if(error) return toast(error.message); S.profile.display_name = name; toast('変更しました'); break; }
       case 'fAbs': { const sid = fd.get('student_id'); const more = f.dataset.more==='1';
         const { error } = await S.sb.rpc('submit_absence2', { p_student_id: sid, p_kind: fd.get('kind'), p_date_from: fd.get('date_from'), p_date_to: fd.get('date_to') || fd.get('date_from'), p_reason: fd.get('reason') || null, p_detail: (fd.get('detail')||'').trim() || null });
