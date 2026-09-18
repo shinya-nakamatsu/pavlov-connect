@@ -38,7 +38,7 @@
 /* ─────────────────────────────────────────────
    配色は 白:赤:黒 = 7:2:1
      白 … 背景・タイル・余白（画面のほとんど）
-     赤 … ロゴ／在室中のタイル／選択中の学年／モード切替ボタン
+     赤 … ロゴ／在室中のタイル／選択中の学年／入室・退室の切替
      黒 … 文字と細い罫線。面で使うのは「退室モード」のヘッダーだけ
    富士学院版は赤の代わりに紺が入る（data-brand="fuji"）
    ───────────────────────────────────────────── */
@@ -78,10 +78,15 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .roomsw{cursor:pointer;font-weight:700;font-size:15px;color:var(--sub)}
 .bar.out .roomsw{color:#fff}
 .right{margin-left:auto;display:flex;align-items:center;gap:14px}
-.modename{font-size:18px;font-weight:700;letter-spacing:.04em;color:var(--brand)}
-.bar.out .modename{color:#fff}
-.modebtn{background:var(--brand);color:#fff;border:0;padding:11px 20px;font-size:16px;font-weight:700;cursor:pointer}
-.bar.out .modebtn{background:#fff;color:var(--brand)}
+/* 入室／退室は「今どちらか」を示す表示と切替ボタンを兼ねる。
+   選ばれている側だけが塗りつぶし。押した方になる、という見た目にしてある。 */
+.modesw{display:flex;border:2px solid var(--brand);border-radius:0;overflow:hidden}
+.mbtn{background:#fff;color:var(--brand);border:0;border-radius:0;
+      padding:9px 26px;font-size:18px;font-weight:700;letter-spacing:.12em;cursor:pointer;opacity:.45}
+.mbtn.on{background:var(--brand);color:#fff;opacity:1}
+.bar.out .modesw{border-color:#fff}
+.bar.out .mbtn{background:transparent;color:#fff}
+.bar.out .mbtn.on{background:#fff;color:var(--brand)}
 
 /* ── 学年タブ：白地。選ばれているものだけ赤 ── */
 .tabs{flex:0 0 auto;display:flex;background:#fff;border-bottom:1px solid var(--line)}
@@ -155,7 +160,7 @@ button{border-radius:0;appearance:none;font-family:inherit}
 }
 @media (max-width:430px){
   .grid{grid-template-columns:repeat(2,1fr)}
-  .modename{display:none}
+  .mbtn{padding:9px 16px;font-size:16px;letter-spacing:.06em}
 }
 </style>
 </head>
@@ -282,8 +287,10 @@ function viewMain(rooms){
         '<button class="icon" id="reload" title="最新に更新">⟳</button>'+
         (rooms.length>1 ? '<span class="roomsw" id="roomsw">'+esc(room)+' ▾</span>' : '')+
         '<div class="right">'+
-          '<span class="modename" id="modename">入室モード</span>'+
-          '<button class="modebtn" id="modebtn">モード切替</button>'+
+          '<div class="modesw">'+
+            '<button class="mbtn" id="modeIn">入室</button>'+
+            '<button class="mbtn" id="modeOut">退室</button>'+
+          '</div>'+
         '</div>'+
       '</div>'+
       '<div class="tabs" id="tabs"></div>'+
@@ -296,7 +303,8 @@ function viewMain(rooms){
       '</div>'+
       '<div class="toast" id="toast"></div>'+
     '</div>';
-  $('modebtn').onclick = toggleMode;
+  $('modeIn').onclick  = function(){ setMode('in'); };
+  $('modeOut').onclick = function(){ setMode('out'); };
   $('gear').onclick = openMenu;
   $('reload').onclick = async function(){ await refresh(); toast('最新にしました','warn'); };
   if($('roomsw')) $('roomsw').onclick = function(){
@@ -344,12 +352,13 @@ function drawGrid(){
 }
 
 // ── モード ──
-function toggleMode(){ mode = (mode==='in'?'out':'in'); applyMode(); armAutoBack(60000); }
+function setMode(m){ mode = m; applyMode(); armAutoBack(60000); }
 function applyMode(){
   var bar = $('bar'); if(!bar) return;
   bar.classList.toggle('out', mode==='out');
   var w = $('wrap'); if(w) w.classList.toggle('out', mode==='out');
-  $('modename').textContent = (mode==='in') ? '入室モード' : '退室モード';
+  $('modeIn').classList.toggle('on',  mode==='in');
+  $('modeOut').classList.toggle('on', mode==='out');
   drawGrid();
 }
 function armAutoBack(ms){
