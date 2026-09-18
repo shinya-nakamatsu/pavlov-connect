@@ -64,13 +64,13 @@ button{border-radius:0;appearance:none;font-family:inherit}
 
 .wrap{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;background:#fff}
 
-/* ── ヘッダー：白地＋赤の細い下線。退室モードだけ黒帯に反転する ── */
+/* ── ヘッダー：白地＋赤の細い下線。退室モードだけ赤帯に反転する ── */
 .bar{flex:0 0 auto;background:#fff;color:var(--ink);display:flex;align-items:center;gap:14px;
      padding:10px 20px;padding-top:calc(10px + env(safe-area-inset-top));
      border-bottom:3px solid var(--brand)}
-.bar.out{background:var(--ink);color:#fff;border-bottom-color:var(--ink)}
+.bar.out{background:var(--brand);color:#fff;border-bottom-color:var(--brand-dark)}
 .logo{height:30px;width:auto;display:block}
-.bar.out .logo{filter:brightness(0) invert(1)}   /* 黒帯では白抜きにする */
+.bar.out .logo{filter:brightness(0) invert(1)}   /* 赤帯では白抜きにする */
 .logotext{font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brand)}
 .bar.out .logotext{color:#fff}
 .icon{background:none;border:0;color:var(--sub);font-size:22px;line-height:1;padding:6px 8px;cursor:pointer}
@@ -81,15 +81,15 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .modename{font-size:18px;font-weight:700;letter-spacing:.04em;color:var(--brand)}
 .bar.out .modename{color:#fff}
 .modebtn{background:var(--brand);color:#fff;border:0;padding:11px 20px;font-size:16px;font-weight:700;cursor:pointer}
-.bar.out .modebtn{background:#fff;color:var(--ink)}
+.bar.out .modebtn{background:#fff;color:var(--brand)}
 
 /* ── 学年タブ：白地。選ばれているものだけ赤 ── */
 .tabs{flex:0 0 auto;display:flex;background:#fff;border-bottom:1px solid var(--line)}
-/* 退室モードのときだけ出る黒い指示バー。
+/* 退室モードのときだけ出る指示バー。ヘッダーより一段濃い赤で、上の赤帯と地続きに見せる。
    【なぜ足したか】ヘッダーの反転だけでは「今どちらのモードか」に気づかない人がいる。
    生徒が読める言葉で1行出すのが、色を増やさずにいちばん確実。 */
 .hint{display:none}
-.wrap.out .hint{display:block;flex:0 0 auto;background:var(--ink);color:#fff;text-align:center;
+.wrap.out .hint{display:block;flex:0 0 auto;background:var(--brand-dark);color:#fff;text-align:center;
   padding:11px 8px;font-size:18px;font-weight:700;letter-spacing:.08em}
 .tab{flex:1;background:#fff;color:var(--sub);border:0;border-bottom:4px solid transparent;
      padding:14px 4px;cursor:pointer}
@@ -119,12 +119,12 @@ button{border-radius:0;appearance:none;font-family:inherit}
       border-top:1px solid var(--line)}
 .foot .clock{margin-left:auto;font-size:18px;font-weight:700;letter-spacing:.05em;color:var(--ink)}
 
-/* ── トースト：入室は赤、退室は黒 ── */
+/* ── トースト：入室は赤、退室は一段濃い赤 ── */
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);
        background:var(--brand);color:#fff;padding:16px 30px;font-size:22px;font-weight:700;text-align:center;
        opacity:0;pointer-events:none;transition:.18s;z-index:20}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast.out{background:var(--ink)}
+.toast.out{background:var(--brand-dark)}
 .toast.warn{background:#4a4a4a}
 
 /* ── ログイン・メニュー ── */
