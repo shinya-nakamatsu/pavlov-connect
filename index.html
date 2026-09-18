@@ -212,7 +212,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.6.1',
+  VERSION: '0.7.0',
   VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
@@ -510,7 +510,7 @@ function vAuth(){
       <button class="btn block">ログイン</button>
       <p class="center mt"><a href="#" data-act="authmode" data-v="reset" class="small">パスワードを忘れた方</a></p></form>`;
   else if(m==='signup') body = `<form id="fSignup">
-      <label class="f"><span>お名前（例：山田 花子）</span><input class="in" name="name" required></label>
+      <label class="f"><span>お名前（登録される方ご本人。保護者の方は保護者様のお名前）</span><input class="in" name="name" required></label>
       <label class="f"><span>メールアドレス</span><input class="in" name="email" type="email" autocomplete="email" required></label>
       <label class="f"><span>パスワード（8文字以上）</span><input class="in" name="password" type="password" minlength="8" autocomplete="new-password" required></label>
       <label class="f"><span>招待コード（塾から受け取った8桁。あとからでも入力できます）</span><input class="in" name="code" placeholder="例: ABCD2345" style="text-transform:uppercase"></label>
@@ -629,7 +629,7 @@ function vStudents(){
   const byCls = {};
   S.students.filter(s=>!q||s.name.includes(q)||(s.name_kana||'').includes(q)).forEach(s => { const k = s.classrooms?.name || '未設定'; (byCls[k] ||= []).push(s); });
   const order = S.classrooms.map(c=>c.name);
-  const groups = Object.keys(byCls).sort((a,b)=>order.indexOf(a)-order.indexOf(b)).map(k => `<div class="sect">${esc(k)}教室（${byCls[k].length}）</div><div class="list">` +
+  const groups = Object.keys(byCls).sort((a,b)=>order.indexOf(a)-order.indexOf(b)).map(k => `<div class="sect row"><span class="grow">${esc(k)}教室（${byCls[k].length}）</span>${byCls[k][0]?.classroom_id?`<a class="small" href="${bulkGuideUrl(byCls[k][0].classroom_id, k)}" target="_blank" rel="noopener">📄 案内を一括出力</a>`:''}</div><div class="list">` +
     byCls[k].map(s=>`<div class="item" data-act="openStudent" data-id="${s.id}"><div class="av">${esc(initial(s.name))}</div><div class="grow"><div class="t">${esc(s.name)}</div><div class="d">${esc(s.grade||'')} ${esc(s.school||'')}</div></div><div class="meta">${s.status==='suspended'?'<span class="pill gray">休会</span>':''}</div></div>`).join('') + `</div>`).join('');
   return `<div class="row" style="padding:10px 12px 0"><input class="in grow" placeholder="生徒名で検索" data-act="sq" value="${esc(q)}"></div><div class="wrap">${groups}</div>`;
 }
@@ -833,10 +833,14 @@ async function saveAnn(form){
 
 
 /* 招待コード入りの案内（印刷/PDF）を開く */
+function bulkGuideUrl(classroom_id, cls){
+  const brand = Object.values(BRANDS).find(b=>b.classrooms.includes(cls))?.key || S.brand.key;
+  return 'guide.html?' + new URLSearchParams({ bulk: classroom_id, brand }).toString();
+}
 function guideUrl(st, code){
   const cls = st.classrooms?.name || st.classroom_name || '';
   const brand = Object.values(BRANDS).find(b=>b.classrooms.includes(cls))?.key || S.brand.key;
-  const q = new URLSearchParams({ code, name: st.name, cls, grade: st.grade||'', brand, print:'1' });
+  const q = new URLSearchParams({ sid: st.id, code: code||'', name: st.name, cls, grade: st.grade||'', brand, print:'1' });
   return 'guide.html?' + q.toString();
 }
 
@@ -845,7 +849,7 @@ function vStudent(){
   const s = S.curStudent; const inv = S.curInvites||[]; const gs = S.curGuardians||[];
   return `${hdr(s.name, `${s.grade||''} ${s.classrooms?.name||''}教室`, {back:true})}<div class="main noTab"><div class="wrap">
     <div class="card"><div class="row"><h2 class="grow" style="margin:0">招待コード</h2><button class="btn sm sec" data-act="issueInvite" data-id="${s.id}">＋ 発行</button></div>
-      <p class="muted small">保護者にこのコードを伝えてください（有効期限90日・1コード1人）。父・母それぞれ登録する場合は2つ発行します。</p>
+      <p class="muted small">保護者にこのコードを伝えてください（有効期限180日・1コード1人）。案内PDFには父・母用にコードが2つ印字されます（足りなければ自動で発行）。</p>
       ${inv.length?inv.map(i=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span class="code grow">${i.code.slice(0,4)}-${i.code.slice(4)}</span>${i.used_at?`<span class="pill ok">使用済み ${fmtTime(i.used_at)}</span>`:(new Date(i.expires_at)<new Date()?'<span class="pill gray">期限切れ</span>':`<a class="btn sm sec" href="${guideUrl(s, i.code)}" target="_blank" rel="noopener">案内PDF</a> <button class="btn sm ghost" data-act="copy" data-v="${i.code}">コピー</button>`)}</div>`).join(''):'<p class="muted small">まだ発行されていません</p>'}
     </div>
     <div class="card"><h2>登録済みの保護者（${gs.length}）</h2>${gs.length?gs.map(g=>`<div class="row" style="padding:6px 0"><div class="grow">${esc(g.display_name)} <span class="muted small">${esc(g.relation)}</span><br><span class="muted small">${esc(g.email)}</span></div><a href="#" data-act="unlinkG" data-gid="${g.id}" data-sid="${s.id}" class="small" style="color:var(--danger)">解除</a></div>`).join(''):'<p class="muted small">まだ保護者が登録していません</p>'}
