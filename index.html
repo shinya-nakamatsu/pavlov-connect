@@ -212,7 +212,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.7.0',
+  VERSION: '0.7.1',
   VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
@@ -353,7 +353,9 @@ async function loadInbox(){ const { data } = await S.sb.rpc('staff_inbox'); S.in
 async function loadAnns(){ const { data } = await S.sb.rpc('list_announcements', { p_limit: 100 }); S.anns = data || []; }
 async function loadStudents(){ const { data } = await S.sb.from('students').select('*, classrooms(name,sort_order)').neq('status','withdrawn').order('name'); S.students = data || []; }
 async function loadThread(thread_id){
-  const { data: msgs } = await S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('thread_id', thread_id).is('deleted_at', null).order('created_at').limit(500);
+  let q = S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('thread_id', thread_id).is('deleted_at', null);
+  if(S.staff) q = q.neq('kind', 'attendance');   // 講師側には入退室の記録を出さない（打刻画面・ログで確認）
+  const { data: msgs } = await q.order('created_at').limit(500);
   return msgs || [];
 }
 function unreadTotal(){ return S.staff ? S.inbox.reduce((a,t)=>a+(t.unread||0),0) : S.children.reduce((a,c)=>a+(c.unread||0),0); }
@@ -365,6 +367,7 @@ function startRealtime(){
   S.rt = S.sb.channel('pv-live')
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, async payload => {
       const m = payload.new;
+      if(S.staff && m.kind === 'attendance') return;   // 講師側は入退室を無視
       if(S.chat && S.chat.thread_id === m.thread_id){
         if(S.chat.messages.some(x=>x.id===m.id)) return;
         // 送信者名と添付を取りに行く
