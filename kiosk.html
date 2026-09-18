@@ -151,6 +151,13 @@ button{border-radius:0;appearance:none;font-family:inherit}
              background:#fff;color:var(--ink);border:1px solid var(--line);cursor:pointer}
 .menu button:active{background:var(--pale)}
 .menu .who{font-size:13px;color:var(--sub);margin-bottom:14px;word-break:break-all}
+/* 取消しの確認。押し間違いを1タップで消さないための関門。
+   「取り消す」だけブランド色にして、指がどちらに行くか迷わせない。 */
+.menu .ask{font-size:21px;font-weight:700;line-height:1.5;margin-bottom:6px}
+.menu .sub{font-size:14px;color:var(--sub);margin-bottom:18px;line-height:1.6}
+.menu button.danger{background:var(--brand);color:#fff;border-color:var(--brand);
+                    text-align:center;font-weight:700;font-size:18px}
+.menu button.plain{text-align:center}
 
 @media (max-width:760px){
   .grid{grid-template-columns:repeat(3,1fr);gap:8px;padding:10px}
@@ -185,6 +192,12 @@ var room  = null;        // 表示中の教室（複数見える権限のとき�
 var mode  = 'in';
 var modeTimer = null;
 var lockUntil = {};      // 生徒ごとの二度押しロック
+// この端末で直前に打刻したものだけ取り消せる。{student_id: {logId, kind, at}}
+var lastPunch = {};
+var CANCEL_MS = 30000;   // 打刻から30秒以内なら取り消せる
+// Connect 側に cancel_attendance がまだ無いあいだ、取消しの確認は出さない。
+// 「取り消したのに消えない」を現場に見せないため、起動時に1回だけ有無を確かめる。
+var canCancel = false;
 var reloadTimer = null;
 
 var $ = function(id){ return document.getElementById(id); };
@@ -368,9 +381,21 @@ function armAutoBack(ms){
 }
 
 // ── 打刻 ──
+// この端末の直前の打刻で、まだ取消しできるものを返す（なければ null）
+function cancelable(s){
+  var p = lastPunch[s.student_id];
+  if(!p) return null;
+  if(Date.now() - p.at > CANCEL_MS){ delete lastPunch[s.student_id]; return null; }
+  return p;
+}
+
 async function punch(s){
   var now = Date.now();
   var goingIn = (mode==='in');
+  // 【2回押したら取消し】直前に打刻した本人をもう一度押したときは、
+  // 「すでに入室しています」で突き放さず、取消しの確認を出す。
+  var c = canCancel ? cancelable(s) : null;
+  if(c){ askCancel(s, c); return; }
   // 【なぜ無反応にしないか】押しても何も起きないと、生徒は押せたのか分からず連打する。
   // 押せない場合は必ず理由を出す。
   if(goingIn && s.last_kind === 'in'){
@@ -396,12 +421,51 @@ async function punch(s){
   }
   s.last_kind = goingIn ? 'in' : 'out';
   s.last_at = new Date().toISOString();
+  // record_attendance は作った attendance_logs の id を返す。取消しに使う。
+  lastPunch[s.student_id] = { logId: r.data, kind: goingIn?'in':'out', at: Date.now() };
+  setTimeout(function(){
+    var q = lastPunch[s.student_id];
+    if(q && Date.now() - q.at >= CANCEL_MS) delete lastPunch[s.student_id];
+  }, CANCEL_MS + 500);
   drawGrid();
   toast(s.student_name + ' さん　' + (goingIn?'入室':'退室') + '　' + hhmm(new Date()), goingIn?'in':'out');
   if(!goingIn) armAutoBack(8000);
 }
 
 // ── 小物 ──
+// ── 打刻の取消し ──
+function askCancel(s, p){
+  var label = (p.kind==='in' ? '入室' : '退室');
+  var el = document.createElement('div');
+  el.className = 'menu';
+  el.innerHTML = '<div class="box">'+
+    '<div class="ask">'+esc(s.student_name)+' さんの<br>'+label+'（'+hhmm(new Date(p.at))+'）を取り消しますか？</div>'+
+    '<div class="sub">押し間違えたときだけ使ってください。取り消すと、保護者の画面からもこの'+label+'の通知が消えます。</div>'+
+    '<button class="danger" id="c-yes">取り消す</button>'+
+    '<button class="plain" id="c-no">やめる</button></div>';
+  document.body.appendChild(el);
+  var close = function(){ clearTimeout(el._t); el.remove(); };
+  el.onclick = function(e){ if(e.target===el) close(); };
+  el.querySelector('#c-no').onclick = close;
+  el.querySelector('#c-yes').onclick = async function(){ close(); await doCancel(s, p); };
+  // 開きっぱなしで次の生徒の邪魔にならないよう、15秒で自動的に閉じる
+  el._t = setTimeout(close, 15000);
+}
+
+async function doCancel(s, p){
+  var label = (p.kind==='in' ? '入室' : '退室');
+  var r = await sb.rpc('cancel_attendance', { p_log_id: p.logId });
+  if(r.error){
+    // 取り消せていないのに消えたと思われるのがいちばん困る。はっきり言う。
+    toast('取り消せませんでした。記録は残っています', 'warn');
+    return;
+  }
+  delete lastPunch[s.student_id];
+  lockUntil[s.student_id] = 0;
+  await refresh();
+  toast(s.student_name + ' さんの' + label + 'を取り消しました', 'warn');
+}
+
 function toast(msg, kind){
   var el = $('toast'); if(!el) return;
   el.textContent = msg;
@@ -441,6 +505,16 @@ function openMenu(){
   el.querySelector('#m-out').onclick = async function(){ el.remove(); await sb.auth.signOut(); };
 }
 
+// cancel_attendance がこの環境にあるか、存在しないIDで1回だけ試して確かめる。
+// 無ければ PostgREST が PGRST202（関数が見つからない）を返す。何も消さない。
+async function probeCancel(){
+  try{
+    var r = await sb.rpc('cancel_attendance', { p_log_id: '00000000-0000-0000-0000-000000000000' });
+    var m = r.error ? String(r.error.code||'') + ' ' + String(r.error.message||'') : '';
+    canCancel = !/PGRST202|Could not find the function|does not exist/i.test(m);
+  }catch(e){ canCancel = false; }
+}
+
 // ── 起動 ──
 async function boot(){
   var rooms;
@@ -452,6 +526,7 @@ async function boot(){
     return;
   }
   viewMain(rooms);
+  probeCancel();
   // 名簿と在室状況を5分ごとに読み直す（他の端末やConnect側の変更を拾う）
   clearInterval(reloadTimer);
   reloadTimer = setInterval(refresh, 5*60*1000);
