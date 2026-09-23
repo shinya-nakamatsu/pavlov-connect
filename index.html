@@ -131,6 +131,12 @@ textarea.in{min-height:96px;resize:vertical}
 .m .bub.absence{border-left:3px solid var(--red)}
 .m.me .bub.absence{border-left:3px solid var(--red)}
 .m .bub.att{background:var(--red-tint);color:var(--red-dark);border-color:var(--red-line);font-weight:500}
+.m .bub.inv{white-space:normal;border:1.5px solid var(--red);background:#fff;padding:0;min-width:min(260px,78%)}
+.inv .ih{background:var(--red);color:#fff;font-size:11.5px;letter-spacing:.12em;padding:4px 12px;font-weight:700}
+.inv .ib{padding:10px 12px}.inv .it{font-weight:700;font-size:14px}.inv .ia{font-size:22px;font-weight:700;color:var(--red-dark);margin:2px 0}.inv .id{font-size:12px;color:var(--gray-6)}
+.inv .il{font-size:12.5px;color:#333;margin:6px 0 0;padding-top:6px;border-top:1px dashed var(--line)}.inv .il div{display:flex;justify-content:space-between;gap:8px}
+.inv .btn{margin-top:10px}.inv .paid{margin-top:8px;display:inline-block}
+.invrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.invrow:first-of-type{border-top:0}.invrow .amt{font-weight:700;white-space:nowrap}
 .m .bub img{max-width:100%;border-radius:0;display:block}
 .m .bub .file{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--red-dark)}
 .m.me .bub .file{color:var(--red-dark)}
@@ -212,7 +218,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.7.1',
+  VERSION: '0.8.0',
   VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
@@ -282,6 +288,7 @@ const S = {
   chat: null,        // {thread_id, student, messages[], guardians[]}
   filters: { classroom: 'all', unreadOnly: false, q: '', status: 'all' },
   signedUrls: {}, rt: null, busy: false,
+  unpaid: [], curInvoices: [],
 };
 
 /* ---------------- 起動 ---------------- */
@@ -335,10 +342,18 @@ async function afterLogin(){
 // 通知タップ（?thread=… / ?ann=…）で該当画面を開く
 async function openFromUrl(){
   const qp = new URLSearchParams(location.search);
-  const th = qp.get('thread'), an = qp.get('ann');
-  if(!th && !an) return;
+  const th = qp.get('thread'), an = qp.get('ann'), paid = qp.get('paid');
+  if(!th && !an && !paid) return;
   const keep = qp.get('brand') ? '?brand='+encodeURIComponent(qp.get('brand')) : '';
   try{ history.replaceState(null, '', location.pathname + keep); }catch(e){}
+  if(paid){
+    // Stripe から戻ってきた（Webhook の反映に数秒かかることがあるので少し待って再読込）
+    toast('お支払い手続きが完了しました。ありがとうございます。');
+    const { data } = await S.sb.rpc('list_invoices'); const target = (data||[]).find(i=>i.id===paid);
+    if(target?.thread_id){ const t = S.children.find(x=>x.thread_id===target.thread_id) || S.inbox.find(x=>x.thread_id===target.thread_id); if(t) await openThread(target.thread_id, t.student_id); }
+    setTimeout(async()=>{ await loadUnpaid(); if(S.chat) await loadChatInvoices(); if(S.view==='main') render(); else if(S.view==='chat') renderChatMsgs(false); }, 4000);
+    return;
+  }
   if(th){
     const t = S.staff ? S.inbox.find(x=>x.thread_id===th) : S.children.find(x=>x.thread_id===th);
     if(t) await openThread(th, t.student_id);
@@ -348,7 +363,12 @@ async function openFromUrl(){
 }
 
 /* ---------------- データ読み込み ---------------- */
-async function loadChildren(){ const { data } = await S.sb.rpc('guardian_home'); S.children = data || []; }
+async function loadChildren(){ const { data } = await S.sb.rpc('guardian_home'); S.children = data || []; await loadUnpaid(); }
+async function loadUnpaid(){ if(S.staff) return; const { data } = await S.sb.rpc('list_invoices', { p_unpaid_only: true }); S.unpaid = data || []; }
+async function loadChatInvoices(){ if(!S.chat?.student?.student_id) return; const { data } = await S.sb.rpc('list_invoices', { p_student_id: S.chat.student.student_id }); S.chat.invoices = data || []; }
+const yen = n => '¥' + Number(n||0).toLocaleString('ja-JP');
+const fmtDate = d => d ? d.replace(/-/g,'/') : '';
+function invStatus(i){ if(i.status==='paid') return {ja:'支払い済み', cls:'ok'}; if(i.status==='void') return {ja:'取消', cls:'gray'}; if(i.due_date && i.due_date < todayISO(0)) return {ja:'期限超過', cls:''}; return {ja:'未払い', cls:'warn'}; }
 async function loadInbox(){ const { data } = await S.sb.rpc('staff_inbox'); S.inbox = data || []; }
 async function loadAnns(){ const { data } = await S.sb.rpc('list_announcements', { p_limit: 100 }); S.anns = data || []; }
 async function loadStudents(){ const { data } = await S.sb.from('students').select('*, classrooms(name,sort_order)').neq('status','withdrawn').order('name'); S.students = data || []; }
@@ -372,6 +392,7 @@ function startRealtime(){
         if(S.chat.messages.some(x=>x.id===m.id)) return;
         // 送信者名と添付を取りに行く
         const { data } = await S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('id', m.id).maybeSingle();
+        if(m.meta?.invoice_id){ await loadChatInvoices(); if(!S.staff) await loadUnpaid(); }
         S.chat.messages.push(data || m); renderChatMsgs(true);
         if(m.sender_id !== S.profile.id) S.sb.rpc('mark_thread_read', { p_thread_id: m.thread_id });
       } else {
@@ -555,7 +576,7 @@ function vMain(){
     else if(t==='students'){ title='生徒'; body=vStudents(); right=`<button data-act="addStudent">＋ 追加</button>`; }
     else { title='設定'; body=vSettings(); }
   } else {
-    if(t==='home'){ title='お知らせ'; sub=S.brand.org; body=vAnns(); }
+    if(t==='home'){ title='お知らせ'; sub=S.brand.org; const up=unpaidCardHtml(); body=(up?`<div class="wrap" style="padding-bottom:0">${up}</div>`:'')+vAnns(); }
     else if(t==='msgs'){ title='メッセージ'; body=vChildren(); }
     else { title='設定'; body=vSettings(); }
   }
@@ -651,7 +672,7 @@ function vSettings(){
     ${isAdmin?`<div class="card"><h2>スタッフ管理</h2><div id="staffList" class="muted small">読み込み中…</div>
       <form id="fAddStaff" class="mt"><label class="f"><span>スタッフを追加（先にこのアプリで新規登録してもらったメールアドレス）</span><div class="row"><input class="in grow" name="email" type="email" placeholder="mail@example.com" required><select class="in" name="role" style="width:auto"><option value="teacher">講師</option><option value="manager">教室長</option><option value="admin">管理者</option></select></div></label><button class="btn sm">追加</button></form>
       <p class="muted small mt">スタッフは全員、全教室のトークを閲覧できます。特定の教室だけに絞りたい講師がいる場合は「担当教室」を設定してください（設定した教室だけが見えるようになります）。</p></div>`:''}
-    <div class="card"><h2>このアプリについて</h2><p class="muted small">${esc(S.brand.app)} v${CONFIG.VERSION}<br>スマホの「ホーム画面に追加」で、アプリのように使えます。<br>iPhone: Safariの共有ボタン → ホーム画面に追加 ／ Android: Chromeのメニュー → ホーム画面に追加</p></div>
+    <div class="card"><h2>このアプリについて</h2><p class="muted small">${esc(S.brand.app)} v${CONFIG.VERSION}<br>スマホの「ホーム画面に追加」で、アプリのように使えます。<br>iPhone: Safariの共有ボタン → ホーム画面に追加 ／ Android: Chromeのメニュー → ホーム画面に追加</p><p class="muted small"><a href="tokushoho.html" target="_blank" rel="noopener">特定商取引法に基づく表記</a>（オンライン決済について）</p></div>
     <button class="btn danger block" data-act="logout">ログアウト</button>
   </div>`;
 }
@@ -667,7 +688,7 @@ async function fillStaffList(){
 function vChat(){
   const c = S.chat, st = c.student;
   const sub = S.staff ? `${st.grade||''} ${st.classroom_name||''}教室${c.guardians?.length?` ・ 保護者: ${c.guardians.map(g=>g.display_name).join('、')}`:' ・ 保護者未登録'}` : `${st.classroom_name||''}教室`;
-  const right = S.staff ? `<button data-act="openStudent" data-id="${st.student_id}">詳細</button>` : '';
+  const right = S.staff ? `<button data-act="newInvoice" data-id="${st.student_id}" data-name="${esc(st.student_name)}">💴 請求</button><button data-act="openStudent" data-id="${st.student_id}">詳細</button>` : '';
   const tst = c.status || 'resolved';
   const statusBar = S.staff ? `<div class="statusbar">
       <span class="muted small">状況</span>
@@ -698,13 +719,47 @@ function renderChatMsgs(scroll){
         ? `<a href="#" data-act="openFile" data-path="${esc(a.storage_path)}"><img data-path="${esc(a.storage_path)}" alt="${esc(a.filename)}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='120'%3E%3C/svg%3E"></a>`
         : `<a href="#" class="file" data-act="openFile" data-path="${esc(a.storage_path)}">📄 ${esc(a.filename)}</a>`).join('');
     }
-    const extra = m.kind==='absence'?' absence':(m.kind==='attendance'?' att':'');
+    let extra = m.kind==='absence'?' absence':(m.kind==='attendance'?' att':'');
+    if(m.kind==='invoice' && m.meta?.invoice_id){ extra=' inv'; inner = invoiceCardHtml(m); }
     html += `<div class="m ${cls}"><div>${who}<div class="bub${extra}">${inner}</div></div><div class="tm">${hm(m.created_at)}</div></div>`;
   }
   if(!S.chat.messages.length) html = `<div class="empty">まだメッセージはありません。${S.staff?'保護者へ最初のメッセージを送りましょう。':'ご質問・ご連絡はこちらからどうぞ。'}</div>`;
   el.innerHTML = html;
   $$('img[data-path]', el).forEach(async img => { img.src = await signedUrl(img.dataset.path); });
   if(scroll) el.scrollTop = el.scrollHeight;
+}
+// トーク内の請求カード
+function invoiceCardHtml(m){
+  const inv = (S.chat?.invoices||[]).find(i=>i.id===m.meta.invoice_id);
+  const title = inv?.title || m.meta.title || 'ご請求', total = inv?.total ?? m.meta.total, due = inv?.due_date || m.meta.due_date;
+  const st = inv ? invStatus(inv) : {ja:'', cls:''};
+  const items = inv?.items?.length ? `<div class="il">${inv.items.map(it=>`<div><span>${esc(it.name)}</span><span>${yen(it.amount)}</span></div>`).join('')}</div>` : '';
+  let action = '';
+  if(inv){
+    if(inv.status==='paid') action = `<span class="pill ok paid">✓ お支払い済み ${inv.paid_at?fmtDT(inv.paid_at):''}${inv.paid_method?'（'+esc(inv.paid_method)+'）':''}</span>`;
+    else if(inv.status==='void') action = `<span class="pill gray paid">この請求は取り消されました</span>`;
+    else if(!S.staff) action = `<button class="btn block" data-act="payInvoice" data-id="${inv.id}">💳 カード・コンビニで支払う</button><div class="small muted" style="margin-top:6px">口座振替・お振込みでお支払いの場合は操作不要です</div>`;
+    else action = `<div class="row" style="margin-top:8px"><button class="btn sm sec" data-act="recPay" data-id="${inv.id}">支払い済みにする</button><button class="btn sm ghost" data-act="voidInvoice" data-id="${inv.id}">取消</button></div>`;
+  }
+  return `<div class="ih">ご請求</div><div class="ib"><div class="it">${esc(title)}</div><div class="ia">${yen(total)}</div>${due?`<div class="id">お支払い期限：${fmtDate(due)}${st.ja&&inv.status!=='paid'?`　<span class="pill ${st.cls}">${st.ja}</span>`:''}</div>`:''}${inv?.note?`<div class="id" style="margin-top:4px">${nl2br(inv.note)}</div>`:''}${items}${action}</div>`;
+}
+// 保護者ホームの「お支払い」カード
+function unpaidCardHtml(){
+  if(S.staff || !S.unpaid.length) return '';
+  return `<div class="card" style="border:1.5px solid var(--red)"><h2>お支払いのお願い（${S.unpaid.length}件）</h2>${S.unpaid.map(i=>{ const st=invStatus(i); return `<div class="invrow"><div class="grow"><div><b>${esc(i.title)}</b> <span class="muted small">${esc(i.student_name)} さん</span></div><div class="small muted">期限 ${fmtDate(i.due_date)||'—'} <span class="pill ${st.cls}">${st.ja}</span></div></div><div class="amt">${yen(i.total)}</div><button class="btn sm" data-act="payInvoice" data-id="${i.id}">支払う</button></div>`; }).join('')}
+    <p class="muted small" style="margin:8px 0 0">カード（Visa/Mastercard/JCB/AMEX 等）・コンビニでお支払いいただけます。口座振替・お振込みで済ませた場合は操作不要です。</p></div>`;
+}
+// Stripe の支払い画面へ
+async function payInvoice(id){
+  if(S.busy) return; S.busy = true; toast('お支払い画面を準備しています…');
+  try{
+    const { data:{ session } } = await S.sb.auth.getSession();
+    const res = await fetch(CONFIG.SUPABASE_URL + '/functions/v1/stripe/checkout', { method:'POST', headers:{ 'content-type':'application/json', 'apikey': CONFIG.SUPABASE_ANON_KEY, 'authorization': 'Bearer ' + session.access_token }, body: JSON.stringify({ invoice_id: id, return_url: location.origin + location.pathname }) });
+    const j = await res.json();
+    if(!res.ok || !j.url){ toast(j.error || 'お支払い画面を開けませんでした'); if(j.paid){ await loadUnpaid(); if(S.chat) await loadChatInvoices(); render(); } return; }
+    location.href = j.url;
+  }catch(e){ toast('お支払い画面を開けませんでした: '+e.message); }
+  finally{ S.busy = false; }
 }
 async function signedUrl(path){
   const c = S.signedUrls[path]; if(c && c.exp > Date.now()) return c.url;
@@ -718,7 +773,8 @@ async function openThread(thread_id, student_id){
   if(S.staff){ student = S.inbox.find(t=>t.thread_id===thread_id); const { data } = await S.sb.rpc('list_guardians', { p_student_id: student_id }); guardians = data||[]; }
   else student = S.children.find(c=>c.thread_id===thread_id);
   const messages = await loadThread(thread_id);
-  S.chat = { thread_id, student, guardians, messages, status: student?.status || 'resolved' };
+  S.chat = { thread_id, student, guardians, messages, status: student?.status || 'resolved', invoices: [] };
+  if(messages.some(m=>m.kind==='invoice')) await loadChatInvoices();
   S.stack.push('main'); S.view='chat'; render();
   await S.sb.rpc('mark_thread_read', { p_thread_id: thread_id });
   if(S.staff) loadInbox(); else loadChildren();
@@ -857,6 +913,9 @@ function vStudent(){
     </div>
     <div class="card"><h2>登録済みの保護者（${gs.length}）</h2>${gs.length?gs.map(g=>`<div class="row" style="padding:6px 0"><div class="grow">${esc(g.display_name)} <span class="muted small">${esc(g.relation)}</span><br><span class="muted small">${esc(g.email)}</span></div><a href="#" data-act="unlinkG" data-gid="${g.id}" data-sid="${s.id}" class="small" style="color:var(--danger)">解除</a></div>`).join(''):'<p class="muted small">まだ保護者が登録していません</p>'}
       <button class="btn block mt" data-act="openThreadOfStudent" data-id="${s.id}">💬 メッセージを開く</button></div>
+    <div class="card"><div class="row"><h2 class="grow" style="margin:0">請求・お支払い</h2><button class="btn sm" data-act="newInvoice" data-id="${s.id}" data-name="${esc(s.name)}">＋ 請求を送る</button></div>
+      <p class="muted small">請求を送ると保護者のトークに「ご請求」が届き、カード・コンビニで支払えます。振込・現金・口座振替で受け取った場合は「支払い済みにする」で記録してください。</p>
+      ${invoiceListHtml(S.curInvoices)}</div>
     <form id="fStudent" class="card"><h2>生徒情報</h2>
       <label class="f"><span>氏名</span><input class="in" name="name" value="${esc(s.name)}" required></label>
       <label class="f"><span>ふりがな</span><input class="in" name="name_kana" value="${esc(s.name_kana||'')}"></label>
@@ -876,11 +935,45 @@ async function openStudent(id){
   const { data: s } = await S.sb.from('students').select('*, classrooms(name,sort_order)').eq('id', id).single();
   const { data: inv } = await S.sb.from('invites').select('*').eq('student_id', id).order('created_at', { ascending:false });
   const { data: gs } = await S.sb.rpc('list_guardians', { p_student_id: id });
-  S.curStudent = s; S.curInvites = inv||[]; S.curGuardians = gs||[];
+  const { data: invs } = await S.sb.rpc('list_invoices', { p_student_id: id });
+  S.curStudent = s; S.curInvites = inv||[]; S.curGuardians = gs||[]; S.curInvoices = invs||[];
   if(prevView!=='student') S.stack.push(prevView==='chat'?'chat':'main');
   S.view='student'; render();
   const { data: att } = await S.sb.from('attendance_logs').select('*').eq('student_id', id).order('occurred_at', { ascending:false }).limit(30);
   const el = $('#attLog'); if(el) el.innerHTML = (att&&att.length) ? att.map(a=>`<div>${fmtDT(a.occurred_at)} ${a.kind==='in'?'<span class="pill ok">入室</span>':'<span class="pill gray">退室</span>'} <span class="muted">${esc(a.method)}</span></div>`).join('') : '記録はまだありません（入退室アプリと連携すると、ここに表示され、保護者にも自動通知されます）';
+}
+/* --- 請求（スタッフ） --- */
+function invoiceListHtml(list){
+  if(!list?.length) return '<p class="muted small">まだ請求はありません</p>';
+  return list.map(i=>{ const st=invStatus(i); return `<div class="invrow" style="display:block"><div class="row"><div class="grow"><b>${esc(i.title)}</b> <span class="pill ${st.cls}">${st.ja}</span></div><div class="amt">${yen(i.total)}</div></div><div class="row" style="margin-top:4px"><div class="small muted grow">${fmtDate(i.issued_at)} 発行${i.due_date?` ・ 期限 ${fmtDate(i.due_date)}`:''}${i.paid_at?` ・ ${fmtDT(i.paid_at)} ${esc(i.paid_method||'')}`:''}</div>${['sent','overdue'].includes(i.status)?`<button class="btn sm sec" data-act="recPay" data-id="${i.id}">支払い済みにする</button><button class="btn sm ghost" data-act="voidInvoice" data-id="${i.id}">取消</button>`:''}</div></div>`; }).join('');
+}
+function sheetInvoice(student_id, name){
+  const d = new Date(); const nextM = new Date(d.getFullYear(), d.getMonth()+1, 1);
+  const period = `${nextM.getFullYear()}-${pad(nextM.getMonth()+1)}`;
+  const due = new Date(d); due.setDate(d.getDate()+10);
+  const dueISO = `${due.getFullYear()}-${pad(due.getMonth()+1)}-${pad(due.getDate())}`;
+  const row = (n, amt) => `<div class="row inv-item" style="margin-bottom:6px"><input class="in grow" name="item_name" placeholder="項目（例：${nextM.getMonth()+1}月分 授業料）" value="${esc(n||'')}"><input class="in" name="item_amount" type="number" min="0" step="1" inputmode="numeric" placeholder="金額" value="${amt||''}" style="width:110px"></div>`;
+  openSheet(`<h3>請求を送る　<span class="muted small">${esc(name||'')} さん</span></h3><form id="fInvoice" data-sid="${student_id}">
+    <label class="f"><span>件名（保護者に表示されます）</span><input class="in" name="title" value="${nextM.getFullYear()}年${nextM.getMonth()+1}月分 授業料" required></label>
+    <input type="hidden" name="period" value="${period}">
+    <div class="f"><span>明細（税込）</span><div id="invItems">${row('','')}${row('','')}</div><button type="button" class="btn sm ghost" data-act="invItemAdd">＋ 行を追加</button></div>
+    <div class="row"><label class="f grow"><span>お支払い期限</span><input class="in" type="date" name="due_date" value="${dueISO}"></label><div class="f grow"><span>合計</span><div class="in" id="invTotal" style="font-weight:700">¥0</div></div></div>
+    <label class="f"><span>メッセージ（任意）　例：口座振替ができなかったため、こちらからお支払いをお願いします。</span><textarea class="in" name="note" style="min-height:64px"></textarea></label>
+    <button class="btn block">請求を送る</button>
+    <p class="muted small mt">送信すると、保護者のトークに「ご請求」が届きます（通知あり）。振替不能事務手数料（1,000円）を頂く場合は明細に1行追加してください。</p></form>`);
+  const f = $('#fInvoice'); f.addEventListener('input', ()=>{ const t = $$('[name=item_amount]', f).reduce((a,x)=>a+(Number(x.value)||0),0); $('#invTotal').textContent = yen(t); });
+}
+function sheetRecPay(id){
+  const inv = (S.curInvoices||[]).concat(S.chat?.invoices||[]).find(i=>i.id===id); if(!inv) return toast('請求が見つかりません');
+  openSheet(`<h3>支払い済みにする</h3><p class="muted small">${esc(inv.title)}　${yen(inv.total)}</p><form id="fRecPay" data-id="${id}">
+    <label class="f"><span>受け取り方法</span><select class="in" name="method"><option>口座振替</option><option>銀行振込</option><option>現金</option><option>その他</option></select></label>
+    <div class="row"><label class="f grow"><span>金額</span><input class="in" type="number" name="amount" value="${inv.total}" min="0" required></label><label class="f grow"><span>入金日</span><input class="in" type="date" name="paid_at" value="${todayISO(0)}" required></label></div>
+    <label class="f"><span>メモ（任意）</span><input class="in" name="note"></label>
+    <button class="btn block">記録する（保護者のトークに「お支払いを確認しました」と流れます）</button></form>`);
+}
+async function refreshInvoices(){
+  if(S.view==='student' && S.curStudent) await openStudent(S.curStudent.id);
+  if(S.chat){ await loadChatInvoices(); if(S.view==='chat') renderChatMsgs(false); }
 }
 function sheetAddStudent(){
   openSheet(`<h3>生徒を追加</h3><form id="fAddStudent">
@@ -939,6 +1032,11 @@ document.addEventListener('click', async e => {
     case 'editCls': { const { data: cur } = await S.sb.from('staff_classrooms').select('classroom_id').eq('staff_id', id); const has = (cur||[]).map(x=>x.classroom_id);
       openSheet(`<h3>${esc(el.dataset.name)} の担当教室</h3><form id="fStaffCls" data-id="${id}"><div class="mb">${S.classrooms.map(c=>`<label class="chk ${has.includes(c.id)?'on':''}"><input type="checkbox" name="cls" value="${c.id}" ${has.includes(c.id)?'checked':''}>${esc(c.name)}</label>`).join('')}</div><button class="btn block">保存</button></form>`); break; }
     case 'closeSheet': closeSheet(); break;
+    case 'newInvoice': sheetInvoice(id, el.dataset.name); break;
+    case 'invItemAdd': { const box=$('#invItems'); if(box) box.insertAdjacentHTML('beforeend', `<div class="row inv-item" style="margin-bottom:6px"><input class="in grow" name="item_name" placeholder="項目"><input class="in" name="item_amount" type="number" min="0" step="1" inputmode="numeric" placeholder="金額" style="width:110px"></div>`); break; }
+    case 'payInvoice': await payInvoice(id); break;
+    case 'recPay': sheetRecPay(id); break;
+    case 'voidInvoice': if(confirm('この請求を取り消しますか？（保護者のトークに「取り消しました」と流れます）')){ const { error } = await S.sb.rpc('void_invoice', { p_invoice_id: id }); if(error) return toast(error.message); toast('取り消しました'); await refreshInvoices(); } break;
   }
 });
 document.addEventListener('change', e => {
@@ -977,6 +1075,15 @@ document.addEventListener('submit', async e => {
         toast('送信しました'); if(S.chat && S.chat.student?.student_id===sid){ S.chat.messages = await loadThread(S.chat.thread_id); renderChatMsgs(true); } else { await loadChildren(); if(S.view==='main') render(); }
         if(more){ const k = fd.get('kind'); closeSheet(); sheetAbsence(k, sid); } else closeSheet(); break; }
       case 'fAnn': await saveAnn(f); break;
+      case 'fInvoice': { const names = fd.getAll('item_name'), amts = fd.getAll('item_amount');
+        const items = names.map((n,i)=>({ name: n.trim(), amount: Math.round(Number(amts[i])||0) })).filter(it=>it.name || it.amount);
+        if(!items.length) return toast('明細を入力してください');
+        if(items.some(it=>!it.name)) return toast('項目名が空の行があります');
+        if(!confirm(`${fd.get('title')}　合計 ${yen(items.reduce((a,it)=>a+it.amount,0))} を送りますか？`)) return;
+        const { error } = await S.sb.rpc('send_invoice', { p_student_id: f.dataset.sid, p_title: fd.get('title').trim(), p_items: items, p_due_date: fd.get('due_date')||null, p_note: (fd.get('note')||'').trim()||null, p_period: fd.get('period')||null });
+        if(error) return toast(error.message); closeSheet(); toast('請求を送りました'); await refreshInvoices(); if(S.view==='main') await loadInbox(); break; }
+      case 'fRecPay': { const { error } = await S.sb.rpc('record_payment', { p_invoice_id: f.dataset.id, p_method: fd.get('method'), p_amount: Math.round(Number(fd.get('amount'))||0), p_paid_at: fd.get('paid_at'), p_note: (fd.get('note')||'').trim()||null });
+        if(error) return toast(error.message); closeSheet(); toast('支払い済みにしました'); await refreshInvoices(); break; }
       case 'fAddStudent': { const w = window.open('', '_blank'); const { data, error } = await S.sb.rpc('create_student', { p_name: fd.get('name').trim(), p_classroom_id: fd.get('classroom_id'), p_grade: fd.get('grade')||null, p_kana: fd.get('kana').trim()||null, p_school: fd.get('school').trim()||null });
         if(error){ if(w) w.close(); return toast(error.message); } closeSheet(); await loadStudents(); await loadInbox(); await openStudent(data[0].student_id); toast('追加しました。招待コード: '+data[0].invite_code);
         const url = guideUrl(S.curStudent, data[0].invite_code); if(w) w.location = url; else window.open(url, '_blank'); break; }
