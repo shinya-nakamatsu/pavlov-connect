@@ -43,15 +43,29 @@
    富士学院版は赤の代わりに紺が入る（data-brand="fuji"）
    ───────────────────────────────────────────── */
 :root{
-  --brand:#c30d23;      /* PAVLOVレッド */
+  --brand:#c30d23;      /* PAVLOVレッド。面を塗る色 */
   --brand-dark:#950006;
   --pale:#fbeef0;
+  --on-brand:#fff;         /* ブランド色の面に乗せる文字 */
+  --brand-text:var(--brand); /* 白地にブランド色で置く文字 */
+  --out-bg:var(--brand);     /* 退室モードのヘッダー */
+  --out-bg2:var(--brand-dark); /* 退室モードの指示バー */
   --ink:#111;           /* 黒 */
   --sub:#6b6b6b;
   --line:#dcdcdc;
 }
 :root[data-brand="fuji"]{
   --brand:#0f3b7d; --brand-dark:#0a2a5c; --pale:#edf1f8;
+}
+/* 小3学園。白:オレンジ:黒 = 5:3:2。
+   【なぜ他の2校と作りが違うか】オレンジは明るいので、面に塗ったとき白文字だと読めない。
+   ロゴも「オレンジの四角＋黒い文字」なので、帯をオレンジにするとロゴが地に溶ける。
+   そこで 面の文字は黒、退室モードの帯は黒、ロゴは白抜きにしない、の3点だけ変えている。 */
+:root[data-brand="sho3"]{
+  --brand:#fe7300; --brand-dark:#c25400; --pale:#fff1e3;
+  --on-brand:#111;
+  --brand-text:#c25400;    /* #fe7300 は白地だと薄くて読みにくい */
+  --out-bg:#111; --out-bg2:#000;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overscroll-behavior:none}
@@ -68,10 +82,11 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .bar{flex:0 0 auto;background:#fff;color:var(--ink);display:flex;align-items:center;gap:14px;
      padding:10px 20px;padding-top:calc(10px + env(safe-area-inset-top));
      border-bottom:3px solid var(--brand)}
-.bar.out{background:var(--brand);color:#fff;border-bottom-color:var(--brand-dark)}
+.bar.out{background:var(--out-bg);color:#fff;border-bottom-color:var(--out-bg2)}
 .logo{height:30px;width:auto;display:block}
-.bar.out .logo{filter:brightness(0) invert(1)}   /* 赤帯では白抜きにする */
-.logotext{font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brand)}
+.bar.out .logo{filter:brightness(0) invert(1)}   /* 色帯では白抜きにする */
+:root[data-brand="sho3"] .bar.out .logo{filter:none}  /* 小3学園は黒帯。白抜きにすると文字が消える */
+.logotext{font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brand-text)}
 .bar.out .logotext{color:#fff}
 .icon{background:none;border:0;color:var(--sub);font-size:22px;line-height:1;padding:6px 8px;cursor:pointer}
 .bar.out .icon{color:#fff}
@@ -81,12 +96,12 @@ button{border-radius:0;appearance:none;font-family:inherit}
 /* 入室／退室は「今どちらか」を示す表示と切替ボタンを兼ねる。
    選ばれている側だけが塗りつぶし。押した方になる、という見た目にしてある。 */
 .modesw{display:flex;border:2px solid var(--brand);border-radius:0;overflow:hidden}
-.mbtn{background:#fff;color:var(--brand);border:0;border-radius:0;
+.mbtn{background:#fff;color:var(--brand-text);border:0;border-radius:0;
       padding:9px 26px;font-size:18px;font-weight:700;letter-spacing:.12em;cursor:pointer;opacity:.45}
-.mbtn.on{background:var(--brand);color:#fff;opacity:1}
+.mbtn.on{background:var(--brand);color:var(--on-brand);opacity:1}
 .bar.out .modesw{border-color:#fff}
 .bar.out .mbtn{background:transparent;color:#fff}
-.bar.out .mbtn.on{background:#fff;color:var(--brand)}
+.bar.out .mbtn.on{background:#fff;color:var(--brand-text)}
 
 /* ── 学年タブ：白地。選ばれているものだけ赤 ── */
 .tabs{flex:0 0 auto;display:flex;background:#fff;border-bottom:1px solid var(--line)}
@@ -94,12 +109,12 @@ button{border-radius:0;appearance:none;font-family:inherit}
    【なぜ足したか】ヘッダーの反転だけでは「今どちらのモードか」に気づかない人がいる。
    生徒が読める言葉で1行出すのが、色を増やさずにいちばん確実。 */
 .hint{display:none}
-.wrap.out .hint{display:block;flex:0 0 auto;background:var(--brand-dark);color:#fff;text-align:center;
+.wrap.out .hint{display:block;flex:0 0 auto;background:var(--out-bg2);color:#fff;text-align:center;
   padding:11px 8px;font-size:18px;font-weight:700;letter-spacing:.08em}
 .tab{flex:1;background:#fff;color:var(--sub);border:0;border-bottom:4px solid transparent;
      padding:14px 4px;cursor:pointer}
 .tab .g{font-size:24px;font-weight:700;letter-spacing:.06em}
-.tab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--brand)}
+.tab[aria-selected="true"]{color:var(--brand-text);border-bottom-color:var(--brand)}
 
 /* ── 名前タイル：白地＋細い罫線。在室中だけ赤で塗る ── */
 .grid{flex:1 1 auto;overflow-y:auto;display:grid;grid-template-columns:repeat(5,1fr);
@@ -108,14 +123,15 @@ button{border-radius:0;appearance:none;font-family:inherit}
       min-height:104px;padding:16px 8px 12px;font-size:27px;font-weight:500;cursor:pointer;
       display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
 .tile .t{font-size:13px;font-weight:400;margin-top:6px;color:var(--sub)}
-.tile.in{background:var(--brand);border-color:var(--brand);color:#fff}
+.tile.in{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
 .tile.in .t{color:rgba(255,255,255,.85)}
+:root[data-brand="sho3"] .tile.in .t{color:rgba(0,0,0,.6)}
 .tile:active{filter:brightness(.94)}
 .tile.na{opacity:.4}
 /* 在室中は押せないだけで薄くしない（「今だれが来ているか」の掲示板を兼ねるため） */
 .tile.in.na{opacity:1}
-.tile .flag{position:absolute;top:4px;left:0;right:0;font-size:12px;font-weight:700;color:var(--brand)}
-.tile.in .flag{color:#fff}
+.tile .flag{position:absolute;top:4px;left:0;right:0;font-size:12px;font-weight:700;color:var(--brand-text)}
+.tile.in .flag{color:var(--on-brand)}
 .empty{padding:28px;color:var(--sub)}
 
 /* ── フッター：白地＋細い上線 ── */
@@ -126,10 +142,10 @@ button{border-radius:0;appearance:none;font-family:inherit}
 
 /* ── トースト：入室は赤、退室は一段濃い赤 ── */
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);
-       background:var(--brand);color:#fff;padding:16px 30px;font-size:22px;font-weight:700;text-align:center;
+       background:var(--brand);color:var(--on-brand);padding:16px 30px;font-size:22px;font-weight:700;text-align:center;
        opacity:0;pointer-events:none;transition:.18s;z-index:20}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast.out{background:var(--brand-dark)}
+.toast.out{background:var(--out-bg2);color:#fff}
 .toast.warn{background:#4a4a4a}
 
 /* ── ログイン・メニュー ── */
@@ -140,7 +156,7 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .card input{width:100%;font-size:17px;padding:14px;margin-bottom:12px;border:1px solid var(--line);
             font-family:inherit;text-align:left}
 .card input:focus{outline:2px solid var(--brand);outline-offset:-2px}
-.card .go{width:100%;font-size:17px;font-weight:700;padding:16px;background:var(--brand);color:#fff;
+.card .go{width:100%;font-size:17px;font-weight:700;padding:16px;background:var(--brand);color:var(--on-brand);
           border:0;cursor:pointer}
 .err{color:var(--brand);font-size:14px;margin-bottom:12px;min-height:1.2em}
 
@@ -155,7 +171,7 @@ button{border-radius:0;appearance:none;font-family:inherit}
    「取り消す」だけブランド色にして、指がどちらに行くか迷わせない。 */
 .menu .ask{font-size:21px;font-weight:700;line-height:1.5;margin-bottom:6px}
 .menu .sub{font-size:14px;color:var(--sub);margin-bottom:18px;line-height:1.6}
-.menu button.danger{background:var(--brand);color:#fff;border-color:var(--brand);
+.menu button.danger{background:var(--brand);color:var(--on-brand);border-color:var(--brand);
                     text-align:center;font-weight:700;font-size:18px}
 .menu button.plain{text-align:center}
 
@@ -216,26 +232,35 @@ if(!deviceId){ deviceId = 'ipad-'+Math.random().toString(36).slice(2,10); localS
 // 白い背景は透明に抜いてあるので、退室モードの黒帯では白抜きで出る。
 var LOGO_PAVLOV = 'data:image/png;base64,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';
 var LOGO_FUJI   = 'data:image/png;base64,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';
+var LOGO_SHO3   = 'data:image/png;base64,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';
+var LOGOS  = { pavlov: LOGO_PAVLOV, fuji: LOGO_FUJI, sho3: LOGO_SHO3 };
+var BRANDNAME = { pavlov: 'PAVLOV', fuji: '富士学院', sho3: '小3学園' };
 function logoHtml(h){
-  var fuji = isFuji();
-  return '<img class="logo" src="' + (fuji ? LOGO_FUJI : LOGO_PAVLOV) +
-         '" alt="' + (fuji ? '富士学院' : 'PAVLOV') + '" style="height:' + h + 'px">';
+  var b = brandOf();
+  return '<img class="logo" src="' + LOGOS[b] +
+         '" alt="' + BRANDNAME[b] + '" style="height:' + h + 'px">';
 }
 
 // ── ブランド（教室名で判定。Connect と同じ挙動）──
-// URLに fuji が含まれていれば富士学院。教室が分かる前（ログイン画面）でも
-// 富士学院のiPadにPAVLOVの赤を一瞬たりとも出さないため。
-function fujiByUrl(){
-  return (location.hostname + location.pathname).toLowerCase().indexOf('fuji') >= 0;
+// 教室が分かる前（ログイン画面）はURLで判定する。
+// 富士学院のiPadにPAVLOVの赤やロゴを一瞬たりとも出さないため。
+// 小3学園はPAVLOVのサイトに相乗りしているので、URLに ?brand=sho3 を付けて使う。
+function brandByUrl(){
+  var u = (location.hostname + location.pathname + location.search).toLowerCase();
+  if(u.indexOf('fuji') >= 0) return 'fuji';
+  if(u.indexOf('sho3') >= 0) return 'sho3';
+  return 'pavlov';
 }
-function isFuji(){
-  // 教室が分かればそれを優先。分かる前（ログイン画面）はURLで判定し、
-  // 富士学院のiPadにPAVLOVのロゴや赤を一瞬たりとも出さない。
-  return room ? (String(room).indexOf('富士学院') >= 0) : fujiByUrl();
+function brandOf(){
+  // 教室が分かればそれを優先。分かる前はURL。
+  if(!room) return brandByUrl();
+  var r = String(room);
+  if(r.indexOf('富士学院') >= 0) return 'fuji';
+  if(r.indexOf('小3学園') >= 0 || r.indexOf('小３学園') >= 0) return 'sho3';
+  return 'pavlov';
 }
 function applyBrand(){
-  var fuji = isFuji();
-  document.documentElement.setAttribute('data-brand', fuji ? 'fuji' : 'pavlov');
+  document.documentElement.setAttribute('data-brand', brandOf());
   var m = document.querySelector('meta[name="theme-color"]');
   if(!m){ m = document.createElement('meta'); m.name='theme-color'; document.head.appendChild(m); }
   m.content = '#1f2430';   // 画面の外枠は中立色。中身の色だけブランドで変える
@@ -344,7 +369,7 @@ function drawGrid(){
   // 講師が「今だれが来ているか」を見る掲示板も兼ねるので、在室人数を常に出しておく
   var nIn = rows().filter(isIn).length;
   var ic = $('incount');
-  if(ic) ic.innerHTML = '在室 <b style="color:var(--brand);font-size:16px">'+nIn+'</b> 人';
+  if(ic) ic.innerHTML = '在室 <b style="color:var(--brand-text);font-size:16px">'+nIn+'</b> 人';
   $('grid').innerHTML = list.map(function(s){
     var inRoom = isIn(s);
     var canTap = (mode==='in') ? !inRoom : inRoom;
