@@ -59,13 +59,11 @@
 }
 /* 小3学園。白:オレンジ:黒 = 5:3:2。
    【なぜ他の2校と作りが違うか】オレンジは明るいので、面に塗ったとき白文字だと読めない。
-   ロゴも「オレンジの四角＋黒い文字」なので、帯をオレンジにするとロゴが地に溶ける。
-   そこで 面の文字は黒、退室モードの帯は黒、ロゴは白抜きにしない、の3点だけ変えている。 */
+   面に乗せる文字は黒にする。白地に置く文字は一段濃いオレンジ。 */
 :root[data-brand="sho3"]{
   --brand:#fe7300; --brand-dark:#c25400; --pale:#fff1e3;
   --on-brand:#111;
   --brand-text:#c25400;    /* #fe7300 は白地だと薄くて読みにくい */
-  --out-bg:#111; --out-bg2:#000;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overscroll-behavior:none}
@@ -85,7 +83,20 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .bar.out{background:var(--out-bg);color:#fff;border-bottom-color:var(--out-bg2)}
 .logo{height:30px;width:auto;display:block}
 .bar.out .logo{filter:brightness(0) invert(1)}   /* 色帯では白抜きにする */
-:root[data-brand="sho3"] .bar.out .logo{filter:none}  /* 小3学園は黒帯。白抜きにすると文字が消える */
+/* 小3学園の退室モード。帯はオレンジのまま、文字は黒。
+   【ロゴだけ扱いが違う理由】このロゴは「オレンジの四角＋黒い文字」なので、
+   白抜きにすると中の文字まで白くなって四角が4つ並ぶだけになる。
+   かといってオレンジの帯にそのまま載せると地に溶ける。
+   そこで白抜きをやめ、ロゴの下に白い座布団を敷いて浮かせている。
+   box-shadow で白を外側に広げているのは、余白を足してもロゴの高さを変えないため。 */
+:root[data-brand="sho3"] .bar.out{color:var(--ink)}
+:root[data-brand="sho3"] .bar.out .logo{filter:none;background:#fff;box-shadow:0 0 0 6px #fff;margin-left:6px}
+:root[data-brand="sho3"] .bar.out .logotext,
+:root[data-brand="sho3"] .bar.out .icon,
+:root[data-brand="sho3"] .bar.out .roomsw,
+:root[data-brand="sho3"] .bar.out .mbtn{color:var(--ink)}
+:root[data-brand="sho3"] .bar.out .modesw{border-color:var(--ink)}
+:root[data-brand="sho3"] .bar.out .mbtn.on{background:#fff;color:var(--brand-text)}
 .logotext{font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brand-text)}
 .bar.out .logotext{color:#fff}
 .icon{background:none;border:0;color:var(--sub);font-size:22px;line-height:1;padding:6px 8px;cursor:pointer}
@@ -132,6 +143,13 @@ button{border-radius:0;appearance:none;font-family:inherit}
 .tile.in.na{opacity:1}
 .tile .flag{position:absolute;top:4px;left:0;right:0;font-size:12px;font-weight:700;color:var(--brand-text)}
 .tile.in .flag{color:var(--on-brand)}
+/* まとめたタブの中に出す学年の見出し。
+   【なぜタイルに学年を書かないか】低学年の子の目にはまず「大きな名前」しか入らない。
+   タイルの隅に小さく「小1」と書いても見落とす。行で区切ったほうが自分の場所を探しやすい。 */
+.ghead{grid-column:1/-1;display:flex;align-items:center;gap:12px;
+  font-size:15px;font-weight:700;color:var(--sub);letter-spacing:.12em;margin-top:10px}
+.ghead:first-child{margin-top:0}
+.ghead::after{content:"";flex:1;height:1px;background:var(--line)}
 .empty{padding:28px;color:var(--sub)}
 
 /* ── フッター：白地＋細い上線 ── */
@@ -303,15 +321,30 @@ function rows(){ return board.filter(function(s){ return s.classroom_name === ro
 function defaultGrade(){
   var count = {};
   rows().forEach(function(s){ var g = s.grade||''; count[g] = (count[g]||0)+1; });
-  var gs = gradesInUse(), best = gs[0], bestN = -1;
-  gs.forEach(function(g){ if((count[g]||0) > bestN){ bestN = count[g]||0; best = g; } });
+  var gs = tabsInUse(), best = gs[0], bestN = -1;
+  gs.forEach(function(t){
+    var n = 0;
+    gradesOfTab(t).forEach(function(g){ n += (count[g]||0); });
+    if(n > bestN){ bestN = n; best = t; }
+  });
   return best;
 }
-function gradesInUse(){
+// 小1〜小3は人数が少ないので1つのタブにまとめる。
+// ラベルを「低学年」にしないのは、入学したての小1に「自分は低学年」という区分が
+// まだ通じないため。「小1〜3｜小4｜小5｜小6」なら数字を探すだけで見つかる。
+var LOW = ['小1','小2','小3'];
+var LOW_TAB = '小1〜3';
+function gradesOfTab(t){ return t === LOW_TAB ? LOW : [t]; }
+function tabsInUse(){
   var set = {}; rows().forEach(function(s){ set[s.grade||''] = 1; });
-  var list = GRADES.filter(function(g){ return set[g]; });
-  if(set['']) list.push('');
-  return list.length ? list : [''];
+  var out = [], low = false;
+  GRADES.forEach(function(g){
+    if(!set[g]) return;
+    if(LOW.indexOf(g) >= 0){ if(!low){ out.push(LOW_TAB); low = true; } return; }
+    out.push(g);
+  });
+  if(set['']) out.push('');
+  return out.length ? out : [''];
 }
 function isIn(s){ return s.last_kind === 'in'; }
 
@@ -352,7 +385,7 @@ function viewMain(rooms){
 }
 
 function drawTabs(){
-  var gs = gradesInUse();
+  var gs = tabsInUse();
   if(gs.indexOf(grade) < 0) grade = defaultGrade();
   $('tabs').innerHTML = gs.map(function(g){
     return '<button class="tab" role="tab" aria-selected="'+(g===grade)+'" data-g="'+esc(g)+'">'+
@@ -362,25 +395,40 @@ function drawTabs(){
   });
 }
 
+function tileHtml(s){
+  var inRoom = isIn(s);
+  var canTap = (mode==='in') ? !inRoom : inRoom;
+  var t = s.last_at ? hhmm(new Date(s.last_at)) : '';
+  var time = inRoom && t ? '<span class="t">'+t+' 入室</span>' : '';
+  var flag = s.absence_kind
+    ? '<span class="flag">'+({absent:'欠席連絡',late:'遅刻連絡',early:'早退連絡'}[s.absence_kind]||'')+'</span>'
+    : '';
+  return '<button class="tile'+(inRoom?' in':'')+(canTap?'':' na')+'" data-id="'+esc(s.student_id)+'">'+
+         flag+'<span>'+esc(s.student_name)+'</span>'+time+'</button>';
+}
+function byKana(a,b){
+  return String(a.name_kana||a.student_name)
+    .localeCompare(String(b.name_kana||b.student_name),'ja');
+}
 function drawGrid(){
-  var list = rows().filter(function(s){ return (s.grade||'') === grade; })
-    .sort(function(a,b){ return String(a.name_kana||a.student_name)
-      .localeCompare(String(b.name_kana||b.student_name),'ja'); });
+  var gl = gradesOfTab(grade);
+  var list = rows().filter(function(s){ return gl.indexOf(s.grade||'') >= 0; }).sort(byKana);
   // 講師が「今だれが来ているか」を見る掲示板も兼ねるので、在室人数を常に出しておく
   var nIn = rows().filter(isIn).length;
   var ic = $('incount');
   if(ic) ic.innerHTML = '在室 <b style="color:var(--brand-text);font-size:16px">'+nIn+'</b> 人';
-  $('grid').innerHTML = list.map(function(s){
-    var inRoom = isIn(s);
-    var canTap = (mode==='in') ? !inRoom : inRoom;
-    var t = s.last_at ? hhmm(new Date(s.last_at)) : '';
-    var time = inRoom && t ? '<span class="t">'+t+' 入室</span>' : '';
-    var flag = s.absence_kind
-      ? '<span class="flag">'+({absent:'欠席連絡',late:'遅刻連絡',early:'早退連絡'}[s.absence_kind]||'')+'</span>'
-      : '';
-    return '<button class="tile'+(inRoom?' in':'')+(canTap?'':' na')+'" data-id="'+esc(s.student_id)+'">'+
-           flag+'<span>'+esc(s.student_name)+'</span>'+time+'</button>';
-  }).join('') || '<div class="empty">この学年の生徒がいません</div>';
+  var html;
+  if(gl.length > 1){
+    html = '';
+    gl.forEach(function(g){
+      var sub = list.filter(function(s){ return (s.grade||'') === g; });
+      if(!sub.length) return;
+      html += '<div class="ghead">'+esc(g)+'</div>' + sub.map(tileHtml).join('');
+    });
+  }else{
+    html = list.map(tileHtml).join('');
+  }
+  $('grid').innerHTML = html || '<div class="empty">この学年の生徒がいません</div>';
   Array.prototype.forEach.call($('grid').querySelectorAll('.tile'), function(el){
     el.onclick = function(){
       var s = board.filter(function(x){ return String(x.student_id)===el.dataset.id; })[0];
