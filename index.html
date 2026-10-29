@@ -131,6 +131,7 @@ textarea.in{min-height:96px;resize:vertical}
 .m .bub.absence{border-left:3px solid var(--red)}
 .m.me .bub.absence{border-left:3px solid var(--red)}
 .m .bub.att{background:var(--red-tint);color:var(--red-dark);border-color:var(--red-line);font-weight:500}
+.m.sys .bub.study{text-align:left;color:var(--ink);font-size:13px;border-left:3px solid var(--red);padding:8px 12px;line-height:1.5}
 .m .bub.inv{white-space:normal;border:1.5px solid var(--red);background:#fff;padding:0;min-width:min(260px,78%)}
 .inv .ih{background:var(--red);color:#fff;font-size:11.5px;letter-spacing:.12em;padding:4px 12px;font-weight:700}
 .inv .ib{padding:10px 12px}.inv .it{font-weight:700;font-size:14px}.inv .ia{font-size:22px;font-weight:700;color:var(--red-dark);margin:2px 0}.inv .id{font-size:12px;color:var(--gray-6)}
@@ -218,7 +219,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_00SOlc3f9a_iTbGlwTOgsQ_Z2p53E6y',   // 公開用キー（RLSで保護されているので埋め込みOK）
   APP_NAME: 'PAVLOV Connect',
   ORG_NAME: '学習塾PAVLOV',
-  VERSION: '0.8.0',
+  VERSION: '0.8.1',
   VAPID_PUBLIC_KEY: 'BNhhk4TY5IqMhYs-jQlEKEQmtHlX9TOJPFsLQuaecnFWOM-ctkFITE4OT25FvHYMEB7QdBuiVAbPlmDm3hyVNtc',
 };
 
@@ -374,7 +375,7 @@ async function loadAnns(){ const { data } = await S.sb.rpc('list_announcements',
 async function loadStudents(){ const { data } = await S.sb.from('students').select('*, classrooms(name,sort_order)').neq('status','withdrawn').order('name'); S.students = data || []; }
 async function loadThread(thread_id){
   let q = S.sb.from('messages').select('*, profiles:sender_id(display_name), message_attachments(*)').eq('thread_id', thread_id).is('deleted_at', null);
-  if(S.staff) q = q.neq('kind', 'attendance');   // 講師側には入退室の記録を出さない（打刻画面・ログで確認）
+  if(S.staff) q = q.not('kind', 'in', '("attendance","study")');   // 講師側には入退室・学習記録を出さない（打刻画面・ログで確認）
   const { data: msgs } = await q.order('created_at').limit(500);
   return msgs || [];
 }
@@ -387,7 +388,7 @@ function startRealtime(){
   S.rt = S.sb.channel('pv-live')
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, async payload => {
       const m = payload.new;
-      if(S.staff && m.kind === 'attendance') return;   // 講師側は入退室を無視
+      if(S.staff && (m.kind === 'attendance' || m.kind === 'study')) return;   // 講師側は入退室・学習記録を無視
       if(S.chat && S.chat.thread_id === m.thread_id){
         if(S.chat.messages.some(x=>x.id===m.id)) return;
         // 送信者名と添付を取りに行く
@@ -709,7 +710,7 @@ function renderChatMsgs(scroll){
   for(const m of S.chat.messages){
     const day = new Date(m.created_at).toDateString();
     if(day!==lastDay){ html += `<div class="dsep"><span>${fmtDateFull(m.created_at)}</span></div>`; lastDay=day; }
-    if(m.sender_type==='system'){ html += `<div class="m sys"><div class="bub">${esc(m.body)}</div></div>`; continue; }
+    if(m.sender_type==='system'){ html += `<div class="m sys"><div class="bub${m.kind==='study'?' study':''}">${esc(m.body)}</div></div>`; continue; }
     const mine = m.sender_id===me;
     const cls = mine?'me':'them';
     const who = (!mine) ? `<div class="who">${esc(m.profiles?.display_name || (m.sender_type==='staff'?S.brand.org:'保護者'))}${m.sender_type==='staff'&&S.staff?'（スタッフ）':''}</div>` : '';
